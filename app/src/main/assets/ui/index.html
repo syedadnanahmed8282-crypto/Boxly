@@ -16,18 +16,19 @@
 <div class="app">
 <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
 
-<section class="scr on" id="home">
+<section class="scr" id="home">
  <div class="row" style="margin-top:6px"><div class="logo"><svg class="i"><use href="#i-logo"/></svg></div><div><div class="t1">Boxly</div><div class="mut">Turn web into apps</div></div></div>
- <div class="seg glass"><button id="tab-code" class="on"><svg class="i"><use href="#i-code"/></svg>Code</button><button id="tab-zip"><svg class="i"><use href="#i-zip"/></svg>ZIP</button></div>
+ <div class="seg glass"><i class="spill" id="spill"></i><button id="tab-code" class="on"><svg class="i"><use href="#i-code"/></svg>Code</button><button id="tab-zip"><svg class="i"><use href="#i-zip"/></svg>ZIP</button></div>
  <div id="pane-code" class="code"><div class="files"><button class="on" data-f="index.html">index.html</button><button data-f="style.css">style.css</button><button data-f="script.js">script.js</button></div><textarea id="ed" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" aria-label="Code editor"></textarea></div>
  <div id="pane-zip" hidden><button class="drop" id="pick"><span class="ib" style="color:#fff"><svg class="i"><use href="#i-up"/></svg></span><b>Choose your project ZIP</b><span class="mut" id="zipinfo">index.html must be inside the ZIP</span></button></div>
+ <div class="glass icard"><div class="ipv" id="iprev"><svg class="i" style="width:28px;height:28px"><use href="#i-logo"/></svg></div><div class="grow"><b>App icon</b><span class="mut" id="ihint">Default Boxly icon</span></div><button class="tag" id="iclr" hidden>Reset</button><button class="tag" id="ipick">Choose logo</button></div>
  <div class="glass det" style="grid-template-columns:1fr"><div><label for="n">App name</label><input id="n" value="My Awesome App" maxlength="32"></div><div class="mut">Included: Camera · Notifications · File access</div></div>
  <button class="btn pulse" id="build"><svg class="i"><use href="#i-dl"/></svg>Build APK</button>
 </section>
 
 <section class="scr" id="building">
  <div class="h1" style="margin-top:6px">Building your app</div>
- <div class="rw"><div class="spin"></div><div class="core"><b id="pct">0%</b><span class="mut">Working…</span></div></div>
+ <div class="rw"><div class="orb"></div><div class="orb o2"></div><div class="spin"></div><div class="core"><b id="pct">0%</b><span class="mut">Working…</span></div></div>
  <div class="glass list">
   <div class="it"><div class="sdot stp"><svg class="i"><use href="#i-ok"/></svg></div><div class="grow"><b>Packing your files</b></div></div>
   <div class="it"><div class="sdot stp"><svg class="i"><use href="#i-ok"/></svg></div><div class="grow"><b>Configuring app details</b></div></div>
@@ -41,27 +42,32 @@
 <section class="scr" id="done">
  <div class="ok-w"><div class="rp"></div><div class="rp d"></div><div class="okc"><svg class="i" style="width:52px;height:52px"><use href="#i-ok"/></svg></div></div>
  <div class="c"><div class="h1">Your app is ready!</div><div class="mut" style="margin-top:6px">Install it now or share the APK.</div></div>
- <div class="glass it"><div class="logo" style="animation:none"><svg class="i"><use href="#i-box"/></svg></div><div class="grow"><b id="dn">App</b><span class="mut" id="dm"></span></div><span class="tag">Signed</span></div>
+ <div class="glass it"><div class="logo" id="dlogo" style="animation:none"><svg class="i"><use href="#i-box"/></svg></div><div class="grow"><b id="dn">App</b><span class="mut" id="dm"></span></div><span class="tag">Signed</span></div>
  <button class="btn pulse" id="inst"><svg class="i"><use href="#i-dl"/></svg>Install now</button>
  <button class="btn ghost" id="shr"><svg class="i"><use href="#i-share"/></svg>Share APK</button>
  <div class="c" id="again" style="font-weight:700;color:#6A44F0;padding:8px;cursor:pointer">Build another app</div>
+ <div id="cf"></div>
 </section>
 
 <section class="scr" id="history"><div class="h1" style="margin-top:6px">History</div><div class="glass list" id="hl"></div></section>
 
 <section class="scr" id="settings"><div class="h1" style="margin-top:6px">Settings</div>
  <div class="sec">Signing</div>
- <div class="glass list"><div class="it"><div class="grow"><b>Signing key</b><span class="mut">Created and kept on this device (Android Keystore)</span></div></div><div class="it"><div class="grow"><b>Version</b><span class="mut">Boxly 1.0.0</span></div></div></div>
+ <div class="glass list"><div class="it"><div class="grow"><b>Signing key</b><span class="mut">Created and kept on this device (Android Keystore)</span></div></div><div class="it"><div class="grow"><b>Version</b><span class="mut">Boxly 2.0.0</span></div></div></div>
+ <div class="sec">Tips</div>
+ <div class="glass it"><div class="grow"><b>App icon</b><span class="mut">A square PNG with a transparent background looks best.</span></div></div>
  <div class="sec">Native API for your apps</div>
  <div class="glass api">Android.toast("Hi")<br>Android.vibrate(200)<br>Android.showNotification("Title","Body")<br>Android.share("text")<br>Android.saveFile("a.txt","text/plain",base64)<br>&lt;input type="file" accept="image/*"&gt; opens camera or files</div>
  <button class="btn ghost" id="clr">Clear history</button>
 </section>
 
-<div class="nav glass" id="nav">
+<div class="nav glass" id="nav"><i class="npill"></i>
  <button id="n-home" class="on"><svg class="i"><use href="#i-box"/></svg>Build</button>
  <button id="n-history"><svg class="i"><use href="#i-clock"/></svg>History</button>
  <button id="n-settings"><svg class="i"><use href="#i-set"/></svg>Settings</button>
 </div>
+
+<div id="splash"><div class="logo"><svg class="i"><use href="#i-logo"/></svg></div><div class="sp-name">Boxly</div><div class="sp-sub">Turn web into apps</div></div>
 </div>
 <script src="app.js"></script>
 </body></html>

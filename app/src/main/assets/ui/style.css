@@ -91,3 +91,58 @@ html,body{height:100%;overflow:hidden;background:#F7F3FF}
 .drop{cursor:pointer;font:inherit;color:inherit;width:100%}
 .err{background:#FFE9EF;color:#9B1C4B;border-radius:16px;padding:12px 14px;font-size:13px;font-weight:600}
 .api{font:11.5px/1.6 ui-monospace,Menlo,Consolas,monospace;color:#3B3760;padding:12px 14px}
+
+/* ===== v2 animations ===== */
+.scr.on{animation:scrIn .5s cubic-bezier(.2,.9,.25,1) both}
+.scr.on>*{animation:rise2 .65s cubic-bezier(.2,.9,.25,1.05) both;animation-delay:calc(var(--i,0)*65ms)}
+.scr.on>.btn:not(.ghost){animation:rise2 .65s cubic-bezier(.2,.9,.25,1.05) both,sheen 3.4s ease-in-out infinite;animation-delay:calc(var(--i,0)*65ms),1.4s}
+@keyframes scrIn{from{opacity:0;transform:translate3d(28px,0,0)}}
+@keyframes rise2{from{opacity:0;transform:translate3d(0,24px,0) scale(.97)}}
+.btn:not(.ghost){background-image:linear-gradient(110deg,rgba(255,255,255,0) 35%,rgba(255,255,255,.42) 50%,rgba(255,255,255,0) 65%),linear-gradient(100deg,#6A44F0,#C92F78);background-size:260% 100%,100% 100%;background-repeat:no-repeat;background-position:160% 0,0 0}
+@keyframes sheen{0%{background-position:160% 0,0 0}60%,100%{background-position:-60% 0,0 0}}
+.btn{transition:transform .15s ease}.btn:active{transform:scale(.97)}
+.seg{position:relative}.seg button{position:relative;z-index:1;transition:color .3s;overflow:hidden}
+.seg button.on{background:none;box-shadow:none;color:#fff}
+.spill{position:absolute;top:4px;bottom:4px;left:4px;width:calc(50% - 6px);border-radius:16px;background:linear-gradient(100deg,#6A44F0,#C92F78);box-shadow:0 6px 16px rgba(106,68,240,.35);transition:transform .55s cubic-bezier(.3,1.35,.5,1)}
+.nav button{position:relative;z-index:1;transition:color .3s;overflow:hidden}
+.nav button.on{background:none;box-shadow:none;color:#fff}
+.nav button.on svg{animation:hop .55s cubic-bezier(.3,1.6,.5,1)}
+@keyframes hop{40%{transform:translateY(-6px) scale(1.2)}}
+.npill{position:absolute;top:6px;left:9px;height:52px;width:calc((100% - 12px)/3 - 6px);border-radius:16px;background:linear-gradient(100deg,#6A44F0,#C92F78);box-shadow:0 6px 16px rgba(106,68,240,.35);transform:translateX(calc(var(--k,0)*(100% + 6px)));transition:transform .55s cubic-bezier(.3,1.35,.5,1)}
+.tag,.files button{position:relative;overflow:hidden}
+button.tag{border:0;cursor:pointer;font-family:inherit;flex:none}
+.rw2{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none}
+.rip{position:absolute;border-radius:50%;background:rgba(255,255,255,.55);transform:scale(0);animation:ripple .6s ease-out forwards}
+.tag .rip,.files .rip,.seg .rip,.nav .rip{background:rgba(106,68,240,.28)}
+@keyframes ripple{to{transform:scale(1);opacity:0}}
+.code{transition:box-shadow .3s}.code:focus-within{box-shadow:0 0 0 2px rgba(124,92,255,.75),0 14px 30px rgba(30,27,58,.28)}
+.swap{animation:swap .45s cubic-bezier(.2,.9,.25,1) both}
+@keyframes swap{from{opacity:0;transform:translate3d(18px,0,0)}}
+.icard{display:flex;align-items:center;gap:12px;padding:12px 14px}.icard b{display:block;font-size:14px}.icard .grow{flex:1;min-width:0}
+.ipv{width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,#7C5CFF,#E0457B 70%,#FF9A5C);color:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;flex:none}
+.ipv img,.logo img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.ipv.pop{animation:pop .6s cubic-bezier(.2,1.4,.4,1)}
+.rw::before{content:"";position:absolute;inset:-26px;border-radius:50%;background:radial-gradient(circle,rgba(201,47,120,.32),rgba(106,68,240,.14) 45%,transparent 68%);animation:breath 2.6s ease-in-out infinite}
+@keyframes breath{50%{transform:scale(1.12);opacity:.7}}
+.orb{position:absolute;inset:-8px;animation:rot 3.2s linear infinite;will-change:transform;pointer-events:none}
+.orb::before{content:"";position:absolute;top:0;left:50%;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:#FF7AAE;box-shadow:0 0 12px 3px rgba(255,122,174,.7)}
+.orb.o2{inset:-20px;animation-duration:5.4s;animation-direction:reverse}
+.orb.o2::before{width:7px;height:7px;background:#7C5CFF;box-shadow:0 0 10px 3px rgba(124,92,255,.7)}
+.sdot.ok{animation:dotpop .5s cubic-bezier(.2,1.5,.4,1)}
+@keyframes dotpop{0%{transform:scale(.4)}}
+.sdot.ok .i{stroke-dasharray:30;stroke-dashoffset:30;animation:draw .45s .12s ease-out forwards}
+.okc .i{stroke:#fff;stroke-width:3;stroke-dasharray:30;stroke-dashoffset:30;animation:draw .6s .5s ease-out forwards}
+#cf{position:absolute;left:50%;top:104px;width:0;height:0;pointer-events:none}
+#cf i{position:absolute;width:8px;height:12px;border-radius:2px;background:var(--c);animation:cf 1.5s cubic-bezier(.15,.8,.3,1) forwards}
+@keyframes cf{0%{transform:translate(0,0) rotate(0);opacity:1}70%{opacity:1}100%{transform:translate(var(--x),calc(var(--y) + 150px)) rotate(var(--r));opacity:0}}
+#hl .it{animation:itIn .55s cubic-bezier(.2,.9,.25,1.05) both;animation-delay:calc(var(--i,0)*70ms)}
+@keyframes itIn{from{opacity:0;transform:translate3d(-24px,0,0)}}
+.sp{position:absolute;border-radius:50%;background:#fff;box-shadow:0 0 8px 2px rgba(124,92,255,.55);opacity:0;pointer-events:none;animation:tw var(--d) ease-in-out var(--dl) infinite}
+@keyframes tw{0%,100%{opacity:0;transform:translateY(0) scale(.5)}50%{opacity:.9;transform:translateY(-26px) scale(1)}}
+#splash{position:absolute;inset:0;z-index:50;background:linear-gradient(165deg,#7C5CFF,#C92F78 70%,#FF9A5C);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#fff;animation:splashOut .6s 1.6s ease-in forwards}
+#splash .logo{width:92px;height:92px;border-radius:30px;background:#fff;color:#C92F78;box-shadow:0 18px 40px rgba(30,27,58,.35);animation:logoIn .95s cubic-bezier(.2,1.3,.4,1) both}
+#splash .logo .i{width:54px;height:54px}
+.sp-name{font-size:34px;font-weight:800;letter-spacing:-.5px;animation:rise2 .7s .5s both}
+.sp-sub{opacity:.9;font-size:13px;animation:rise2 .7s .7s both}
+@keyframes logoIn{from{transform:scale(.2) rotate(-50deg);opacity:0}}
+@keyframes splashOut{to{opacity:0;transform:scale(1.1);visibility:hidden}}

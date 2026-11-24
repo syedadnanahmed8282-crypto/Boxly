@@ -2,6 +2,8 @@ package com.boxly.app
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
@@ -21,6 +23,7 @@ import java.util.zip.ZipInputStream
 class BuilderActivity : Activity() {
     private lateinit var web: WebView
     private var zipFiles: Map<String, ByteArray>? = null
+    private var icon: IconAssets? = null
     private val prefs by lazy { getSharedPreferences("boxly", MODE_PRIVATE) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -86,6 +89,16 @@ class BuilderActivity : Activity() {
         return raw.mapKeys { it.key.removePrefix(strip) }
     }
 
+    private fun decodeImage(uri: Uri): Bitmap {
+        val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        contentResolver.openInputStream(uri)!!.use { BitmapFactory.decodeStream(it, null, o) }
+        var s = 1
+        while (maxOf(o.outWidth, o.outHeight) / s > 1024) s *= 2
+        val o2 = BitmapFactory.Options().apply { inSampleSize = s }
+        return contentResolver.openInputStream(uri)!!.use { BitmapFactory.decodeStream(it, null, o2) }
+            ?: throw IllegalStateException("Could not read this image (use PNG or JPG)")
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
@@ -106,10 +119,33 @@ class BuilderActivity : Activity() {
                     js("onZipError(${JSONObject.quote(e.message ?: "Could not read ZIP")})")
                 }
             }.start()
+        } else if (requestCode == 2 && resultCode == RESULT_OK && uri != null) {
+            Thread {
+                try {
+                    val bmp = decodeImage(uri)
+                    val (assets, preview) = IconMaker.make(bmp)
+                    bmp.recycle()
+                    icon = assets
+                    js("onIconPicked(${JSONObject.quote(preview)})")
+                } catch (e: Throwable) {
+                    icon = null
+                    js("onIconError(${JSONObject.quote(e.message ?: "Could not read image")})")
+                }
+            }.start()
         }
     }
 
     inner class Bridge {
+        @JavascriptInterface
+        fun pickIcon() = runOnUiThread {
+            @Suppress("DEPRECATION")
+            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE); type = "image/*"
+            }, 2)
+        }
+
+        @JavascriptInterface fun clearIcon() { icon = null }
+
         @JavascriptInterface
         fun pickZip() = runOnUiThread {
             @Suppress("DEPRECATION")
@@ -130,9 +166,9 @@ class BuilderActivity : Activity() {
                         o.keys().asSequence().associateWith { o.getString(it).toByteArray() }
                     }
                     if (!files.containsKey("index.html")) throw IllegalStateException("index.html was not found in your project")
-                    val r = ApkBuilder.build(this@BuilderActivity, name, files) { step, pct -> js("onProgress($step,$pct)") }
+                    val r = ApkBuilder.build(this@BuilderActivity, name, files, icon) { step, pct -> js("onProgress($step,$pct)") }
                     val info = JSONObject().put("name", r.label).put("pkg", r.pkg).put("path", r.file.path)
-                        .put("size", r.file.length()).put("time", System.currentTimeMillis())
+                        .put("size", r.file.length()).put("time", System.currentTimeMillis()).put("iconApplied", r.iconApplied)
                     val old = JSONArray(prefs.getString("h", "[]"))
                     val list = JSONArray().put(info)
                     for (i in 0 until minOf(old.length(), 19)) list.put(old.get(i))

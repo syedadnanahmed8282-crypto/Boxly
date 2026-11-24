@@ -1,4 +1,4 @@
-# Boxly — HTML/CSS/JS → APK (on-device)
+# Boxly v2 — HTML/CSS/JS → APK (on-device)
 
 Android app that turns pasted code or a ZIP into an installable APK, fully on the phone.
 
@@ -21,3 +21,7 @@ Local build: open the folder in Android Studio, or run `gradle assembleRelease` 
 - App name: ASCII only, max 32 chars. Package id is generated automatically.
 - Signing key lives in this device's Keystore: wiped if you clear Boxly data/uninstall (apps built later can't update older ones).
 - targetSdk is 29 on purpose (repacked APK). Generated apps also carry the builder code and the install permission.
+
+## New in v2
+- Custom app icon: pick any PNG/JPG; it becomes the launcher icon of the generated app (transparent PNG works best).
+- New animations: splash, sliding tabs/nav, staggered screens, ripples, shimmer button, orbiting build ring, confetti.

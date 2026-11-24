@@ -3,6 +3,7 @@ package com.boxly.app
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
+import android.util.TypedValue
 import com.android.apksig.ApkSigner
 import java.io.File
 import java.math.BigInteger
@@ -17,7 +18,7 @@ import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
 import javax.security.auth.x500.X500Principal
 
-data class BuildResult(val label: String, val pkg: String, val file: File)
+data class BuildResult(val label: String, val pkg: String, val file: File, val iconApplied: Boolean)
 
 /**
  * Builds a new APK by copying this app's own APK, swapping assets/www, patching the package id and
@@ -39,7 +40,7 @@ object ApkBuilder {
         return if (s.isEmpty()) "My App" else s
     }
 
-    fun build(ctx: Context, name: String, files: Map<String, ByteArray>, progress: (Int, Int) -> Unit): BuildResult {
+    fun build(ctx: Context, name: String, files: Map<String, ByteArray>, icon: IconAssets?, progress: (Int, Int) -> Unit): BuildResult {
         progress(0, 10)
         val label = cleanLabel(name)
         val pkg = newPackageId()
@@ -48,15 +49,25 @@ object ApkBuilder {
         val safe = label.replace(Regex("[^A-Za-z0-9]+"), "_").trim('_').ifEmpty { "app" }
         val out = File(dir, "${safe}_${System.currentTimeMillis()}.apk")
 
-        patch(File(ctx.applicationInfo.sourceDir), tmp, label, pkg, files)
+        val iconOk = patch(File(ctx.applicationInfo.sourceDir), tmp, label, pkg, files, icon,
+            resPath(ctx, R.drawable.ic_launcher_fg), resPath(ctx, R.drawable.ic_launcher_bg))
         progress(2, 65)
         sign(tmp, out)
         tmp.delete()
         progress(3, 100)
-        return BuildResult(label, pkg, out)
+        return BuildResult(label, pkg, out, iconOk)
     }
 
-    private fun patch(base: File, out: File, label: String, pkg: String, files: Map<String, ByteArray>) {
+    /** Path of a resource file inside the APK (works even if AGP renamed/moved it). */
+    private fun resPath(ctx: Context, id: Int): String? = runCatching {
+        val tv = TypedValue(); ctx.resources.getValue(id, tv, true); tv.string?.toString()
+    }.getOrNull()
+
+    private fun patch(
+        base: File, out: File, label: String, pkg: String, files: Map<String, ByteArray>,
+        icon: IconAssets?, fgPath: String?, bgPath: String?
+    ): Boolean {
+        var iconHits = 0
         ZipFile(base).use { zf ->
             ZipOutputStream(out.outputStream().buffered()).use { zos ->
                 for (e in zf.entries().asSequence()) {
@@ -64,7 +75,9 @@ object ApkBuilder {
                     if (e.isDirectory) continue
                     if (n.startsWith("META-INF/") && (n.endsWith(".MF") || n.endsWith(".SF") || n.endsWith(".RSA") || n.endsWith(".DSA") || n.endsWith(".EC"))) continue
                     if (n.startsWith("assets/www/") || n.startsWith("assets/ui/") || n == "assets/boxly_runner") continue
-                    val data = zf.getInputStream(e).readBytes()
+                    var data = zf.getInputStream(e).readBytes()
+                    if (icon != null && n == fgPath) { data = icon.fg; iconHits++ }
+                    else if (icon != null && n == bgPath) { data = icon.bg; iconHits++ }
                     if (n == "AndroidManifest.xml") {
                         replaceAll(data, PKG_PLACEHOLDER, pkg)
                         replaceAll(data, LABEL_PLACEHOLDER, label.padEnd(32))
@@ -80,6 +93,7 @@ object ApkBuilder {
                 }
             }
         }
+        return iconHits == 2
     }
 
     private fun sign(input: File, output: File) {
