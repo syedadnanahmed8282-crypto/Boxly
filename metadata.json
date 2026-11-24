@@ -1,0 +1,6 @@
+{
+  "name": "Boxly",
+  "description": "Turn HTML/CSS/JS or a ZIP into an installable Android APK directly on-device.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

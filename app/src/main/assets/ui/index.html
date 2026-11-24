@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Boxly</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-box" viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/></symbol>
+<symbol id="i-logo" viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M13 7l-3.5 5.5h3L11 17l3.5-5.5h-3z"/></symbol>
+<symbol id="i-code" viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></symbol>
+<symbol id="i-zip" viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></symbol>
+<symbol id="i-dl" viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 19h14"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="M12 16V4m0 0L8 8m4-4l4 4M5 20h14"/></symbol>
+<symbol id="i-ok" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></symbol>
+<symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4M5 13v6h14v-6"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><path d="M12 3a9 9 0 100 18 9 9 0 000-18zM12 7v5l3 2"/></symbol>
+<symbol id="i-set" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/></symbol>
+</defs></svg>
+<div class="app">
+<div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+
+<section class="scr on" id="home">
+ <div class="row" style="margin-top:6px"><div class="logo"><svg class="i"><use href="#i-logo"/></svg></div><div><div class="t1">Boxly</div><div class="mut">Turn web into apps</div></div></div>
+ <div class="seg glass"><button id="tab-code" class="on"><svg class="i"><use href="#i-code"/></svg>Code</button><button id="tab-zip"><svg class="i"><use href="#i-zip"/></svg>ZIP</button></div>
+ <div id="pane-code" class="code"><div class="files"><button class="on" data-f="index.html">index.html</button><button data-f="style.css">style.css</button><button data-f="script.js">script.js</button></div><textarea id="ed" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" aria-label="Code editor"></textarea></div>
+ <div id="pane-zip" hidden><button class="drop" id="pick"><span class="ib" style="color:#fff"><svg class="i"><use href="#i-up"/></svg></span><b>Choose your project ZIP</b><span class="mut" id="zipinfo">index.html must be inside the ZIP</span></button></div>
+ <div class="glass det" style="grid-template-columns:1fr"><div><label for="n">App name</label><input id="n" value="My Awesome App" maxlength="32"></div><div class="mut">Included: Camera · Notifications · File access</div></div>
+ <button class="btn pulse" id="build"><svg class="i"><use href="#i-dl"/></svg>Build APK</button>
+</section>
+
+<section class="scr" id="building">
+ <div class="h1" style="margin-top:6px">Building your app</div>
+ <div class="rw"><div class="spin"></div><div class="core"><b id="pct">0%</b><span class="mut">Working…</span></div></div>
+ <div class="glass list">
+  <div class="it"><div class="sdot stp"><svg class="i"><use href="#i-ok"/></svg></div><div class="grow"><b>Packing your files</b></div></div>
+  <div class="it"><div class="sdot stp"><svg class="i"><use href="#i-ok"/></svg></div><div class="grow"><b>Configuring app details</b></div></div>
+  <div class="it"><div class="sdot stp"><svg class="i"><use href="#i-ok"/></svg></div><div class="grow"><b>Signing APK</b></div></div>
+  <div class="it"><div class="sdot stp"><svg class="i"><use href="#i-ok"/></svg></div><div class="grow"><b>Ready to install</b></div></div>
+ </div>
+ <div class="bar"><i id="bar" style="transform:scaleX(0)"></i></div>
+ <div id="err" hidden><div class="err" id="errmsg"></div><button class="btn ghost" id="back" style="margin-top:12px">Back</button></div>
+</section>
+
+<section class="scr" id="done">
+ <div class="ok-w"><div class="rp"></div><div class="rp d"></div><div class="okc"><svg class="i" style="width:52px;height:52px"><use href="#i-ok"/></svg></div></div>
+ <div class="c"><div class="h1">Your app is ready!</div><div class="mut" style="margin-top:6px">Install it now or share the APK.</div></div>
+ <div class="glass it"><div class="logo" style="animation:none"><svg class="i"><use href="#i-box"/></svg></div><div class="grow"><b id="dn">App</b><span class="mut" id="dm"></span></div><span class="tag">Signed</span></div>
+ <button class="btn pulse" id="inst"><svg class="i"><use href="#i-dl"/></svg>Install now</button>
+ <button class="btn ghost" id="shr"><svg class="i"><use href="#i-share"/></svg>Share APK</button>
+ <div class="c" id="again" style="font-weight:700;color:#6A44F0;padding:8px;cursor:pointer">Build another app</div>
+</section>
+
+<section class="scr" id="history"><div class="h1" style="margin-top:6px">History</div><div class="glass list" id="hl"></div></section>
+
+<section class="scr" id="settings"><div class="h1" style="margin-top:6px">Settings</div>
+ <div class="sec">Signing</div>
+ <div class="glass list"><div class="it"><div class="grow"><b>Signing key</b><span class="mut">Created and kept on this device (Android Keystore)</span></div></div><div class="it"><div class="grow"><b>Version</b><span class="mut">Boxly 1.0.0</span></div></div></div>
+ <div class="sec">Native API for your apps</div>
+ <div class="glass api">Android.toast("Hi")<br>Android.vibrate(200)<br>Android.showNotification("Title","Body")<br>Android.share("text")<br>Android.saveFile("a.txt","text/plain",base64)<br>&lt;input type="file" accept="image/*"&gt; opens camera or files</div>
+ <button class="btn ghost" id="clr">Clear history</button>
+</section>
+
+<div class="nav glass" id="nav">
+ <button id="n-home" class="on"><svg class="i"><use href="#i-box"/></svg>Build</button>
+ <button id="n-history"><svg class="i"><use href="#i-clock"/></svg>History</button>
+ <button id="n-settings"><svg class="i"><use href="#i-set"/></svg>Settings</button>
+</div>
+</div>
+<script src="app.js"></script>
+</body></html>
