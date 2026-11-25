@@ -158,3 +158,8 @@ button.tag{border:0;cursor:pointer;font-family:inherit;flex:none}
 button.sw{flex:none}
 #toast{position:absolute;left:50%;bottom:calc(96px + var(--sab,0px));transform:translate(-50%,20px);background:#1E1B3A;color:#fff;padding:10px 16px;border-radius:14px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .3s,transform .4s cubic-bezier(.2,1.2,.4,1);z-index:40;max-width:80%;text-align:center}
 #toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* ===== v4 fixes: buttons no longer shrink, no sideways drift ===== */
+.scr>*{flex-shrink:0}
+.scr{overflow-x:hidden;overscroll-behavior:contain}
+#ed{white-space:pre-wrap;overflow-wrap:anywhere;overflow-x:hidden}

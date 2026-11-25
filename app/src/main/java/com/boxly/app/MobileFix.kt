@@ -10,7 +10,7 @@ object MobileFix {
     private val viewportRe = Regex("<meta[^>]+name\\s*=\\s*[\"']?viewport", RegexOption.IGNORE_CASE)
     private val headRe = Regex("<head(\\s[^>]*)?>", RegexOption.IGNORE_CASE)
     private val htmlRe = Regex("<html(\\s[^>]*)?>", RegexOption.IGNORE_CASE)
-    private const val VIEWPORT = "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">"
+    private const val VIEWPORT = "<meta name=\"viewport\" data-boxly=\"added\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">"
     private const val STYLE = "<style id=\"boxly-fix\">html{-webkit-text-size-adjust:100%;text-size-adjust:100%}body{overflow-x:hidden}img,video,canvas,svg{max-width:100%}</style>"
 
     /** Returns the fixed files and how many HTML files were changed. */

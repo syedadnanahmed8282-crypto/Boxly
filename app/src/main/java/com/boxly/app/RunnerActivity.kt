@@ -67,6 +67,7 @@ class RunnerActivity : Activity() {
         if (preview) lb.addPathHandler("/assets/www/", WebViewAssetLoader.PathHandler { path -> serve(path) })
         else lb.addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
         val loader = lb.build()
+        val checkJs = if (preview) readAsset("ui/check.js") else null
 
         with(web.settings) {
             javaScriptEnabled = true
@@ -81,6 +82,10 @@ class RunnerActivity : Activity() {
         web.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
                 loader.shouldInterceptRequest(request.url)
+
+            override fun onPageFinished(view: WebView, url: String?) {
+                if (checkJs != null) view.evaluateJavascript(checkJs, null)
+            }
 
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val u = request.url
@@ -175,6 +180,14 @@ class RunnerActivity : Activity() {
     }
 
     inner class NativeBridge {
+        @JavascriptInterface fun copyText(text: String) {
+            runOnUiThread {
+                (getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager)
+                    .setPrimaryClip(android.content.ClipData.newPlainText("Boxly", text))
+                Toast.makeText(this@RunnerActivity, "Copied", Toast.LENGTH_SHORT).show()
+            }
+        }
+
         @JavascriptInterface fun toast(msg: String) { runOnUiThread { Toast.makeText(this@RunnerActivity, msg, Toast.LENGTH_SHORT).show() } }
 
         @Suppress("DEPRECATION")
