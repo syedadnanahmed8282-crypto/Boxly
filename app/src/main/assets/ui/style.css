@@ -163,3 +163,12 @@ button.sw{flex:none}
 .scr>*{flex-shrink:0}
 .scr{overflow-x:hidden;overscroll-behavior:contain}
 #ed{white-space:pre-wrap;overflow-wrap:anywhere;overflow-x:hidden}
+
+/* ===== v5: blocking update popup ===== */
+#gate{position:absolute;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(30,27,58,.6);animation:fadeIn .35s both}
+.gcard{width:100%;max-width:340px;padding:26px 20px 20px;text-align:center;display:flex;flex-direction:column;gap:14px;align-items:center;animation:pop .6s cubic-bezier(.2,1.3,.4,1) both}
+.gcard .mut{font-size:14px;line-height:1.55}
+.gcard .btn{width:100%}
+@keyframes fadeIn{from{opacity:0}}
+.gcard.glass{background:linear-gradient(145deg,#fff,#F7F3FF)}
+#gate{background:rgba(30,27,58,.72)}

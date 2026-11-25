@@ -32,6 +32,7 @@ class BuilderActivity : Activity() {
     private var zipFiles: Map<String, ByteArray>? = null
     private var icon: IconAssets? = null
     private var insetsJs = ""
+    private var cfgJs = ""
     private val prefs by lazy { getSharedPreferences("boxly", MODE_PRIVATE) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -69,12 +70,27 @@ class BuilderActivity : Activity() {
 
             override fun onPageFinished(view: WebView, url: String?) {
                 if (insetsJs.isNotEmpty()) view.evaluateJavascript(insetsJs, null)
+                if (cfgJs.isNotEmpty()) view.evaluateJavascript(cfgJs, null)
             }
         }
         web.settings.javaScriptEnabled = true
         web.settings.allowFileAccess = false
         web.addJavascriptInterface(Bridge(), "Boxly")
         web.loadUrl("https://appassets.androidplatform.net/assets/ui/index.html")
+        Telemetry.register(this)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        checkConfig()
+    }
+
+    /** Remote popup: asks Supabase whether the app must show the "update required" screen. */
+    private fun checkConfig() {
+        Telemetry.fetchConfig(this) { json ->
+            cfgJs = "window.onAppConfig && window.onAppConfig($json);"
+            runOnUiThread { web.evaluateJavascript(cfgJs, null) }
+        }
     }
 
     private fun js(code: String) = runOnUiThread { web.evaluateJavascript("window.$code", null) }
@@ -265,6 +281,13 @@ class BuilderActivity : Activity() {
             } catch (e: Throwable) {
                 js("onToast(${JSONObject.quote(e.message ?: e.toString())})")
             }
+        }
+
+        @JavascriptInterface fun recheck() { checkConfig() }
+
+        @JavascriptInterface fun openLink(url: String) {
+            val u = Uri.parse(url)
+            if (u.scheme in listOf("https", "http", "tg", "mailto")) runOnUiThread { runCatching { startActivity(Intent(Intent.ACTION_VIEW, u)) } }
         }
 
         @JavascriptInterface fun history(): String = prefs.getString("h", "[]") ?: "[]"

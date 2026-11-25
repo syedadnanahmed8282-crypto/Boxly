@@ -161,3 +161,15 @@ for (let i = 0; i < 10; i++) {
 }
 setTimeout(() => show('home'), 1500);
 setTimeout(() => { $('#splash').hidden = true; }, 2300);
+
+/* ---------- remote update popup (controlled from Supabase) ---------- */
+window.onAppConfig = c => {
+  const g = $('#gate');
+  if (!c || !c.blocking) { g.hidden = true; return; }
+  $('#gt').textContent = c.title || 'Update available';
+  $('#gm').textContent = c.message || '';
+  const b = $('#gc'); b.hidden = !c.contact_link; b.textContent = c.contact_label || 'Contact';
+  b.onclick = () => B.openLink(c.contact_link);
+  g.hidden = false;
+};
+$('#gr').onclick = () => { if (B.recheck) B.recheck(); toast('Checking\u2026'); };

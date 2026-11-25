@@ -60,7 +60,7 @@
  <div class="sec">Signing</div>
  <div class="glass list"><div class="it"><div class="grow"><b>Signing key</b><span class="mut">Created and kept on this device (Android Keystore)</span></div></div><div class="it"><div class="grow"><b>Version</b><span class="mut">Boxly 3.0.0</span></div></div></div>
  <div class="sec">Tips</div>
- <div class="glass list"><div class="it"><div class="grow"><b>App icon</b><span class="mut">A square PNG with a transparent background looks best.</span></div></div><div class="it"><div class="grow"><b>Website apps</b><span class="mut">URL apps load the live site, so they need internet. Some sites (like Google sign-in) block in-app browsers.</span></div></div></div>
+ <div class="glass list"><div class="it"><div class="grow"><b>App icon</b><span class="mut">A square PNG with a transparent background looks best.</span></div></div><div class="it"><div class="grow"><b>Website apps</b><span class="mut">URL apps load the live site, so they need internet. Some sites (like Google sign-in) block in-app browsers.</span></div></div><div class="it"><div class="grow"><b>Privacy</b><span class="mut">Boxly counts installs: your phone model, Android version and a random ID are sent. No name, number or files.</span></div></div></div>
  <div class="sec">Native API for your apps</div>
  <div class="glass api">Android.toast("Hi")<br>Android.vibrate(200)<br>Android.showNotification("Title","Body")<br>Android.share("text")<br>Android.saveFile("a.txt","text/plain",base64)<br>&lt;input type="file" accept="image/*"&gt; opens camera or files<br><br>(Code/ZIP apps only. Website apps have no native bridge.)</div>
  <button class="btn ghost" id="clr">Clear history</button>
@@ -71,6 +71,7 @@
  <button id="n-history"><svg class="i"><use href="#i-clock"/></svg>History</button>
  <button id="n-settings"><svg class="i"><use href="#i-set"/></svg>Settings</button>
 </div>
+<div id="gate" hidden role="alertdialog" aria-modal="true" aria-labelledby="gt"><div class="gcard glass"><div class="logo"><svg class="i"><use href="#i-logo"/></svg></div><div class="h1" id="gt">Update available</div><div class="mut" id="gm"></div><button class="btn pulse" id="gc" hidden>Contact</button><button class="btn ghost" id="gr">Check again</button></div></div>
 <div id="toast" role="status"></div>
 <div id="splash"><div class="logo"><svg class="i"><use href="#i-logo"/></svg></div><div class="sp-name">Boxly</div><div class="sp-sub">Turn web into apps</div></div>
 </div>
