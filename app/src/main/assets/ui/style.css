@@ -146,3 +146,15 @@ button.tag{border:0;cursor:pointer;font-family:inherit;flex:none}
 .sp-sub{opacity:.9;font-size:13px;animation:rise2 .7s .7s both}
 @keyframes logoIn{from{transform:scale(.2) rotate(-50deg);opacity:0}}
 @keyframes splashOut{to{opacity:0;transform:scale(1.1);visibility:hidden}}
+
+/* ===== v3: edge-to-edge, 3 tabs, toggles ===== */
+.app{padding-top:calc(22px + var(--sat,0px))}
+.scr{padding-bottom:calc(96px + var(--sab,0px))}
+.nav{bottom:calc(14px + var(--sab,0px))}
+.seg{grid-template-columns:repeat(3,1fr)}
+.seg button{font-size:13px;gap:6px}
+.spill{width:calc((100% - 16px)/3);transform:translateX(calc(var(--sk,0)*(100% + 4px)))}
+.fixc{display:flex;align-items:center;gap:12px;padding:12px 14px}.fixc .grow{flex:1;min-width:0}.fixc b{display:block;font-size:14px}
+button.sw{flex:none}
+#toast{position:absolute;left:50%;bottom:calc(96px + var(--sab,0px));transform:translate(-50%,20px);background:#1E1B3A;color:#fff;padding:10px 16px;border-radius:14px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .3s,transform .4s cubic-bezier(.2,1.2,.4,1);z-index:40;max-width:80%;text-align:center}
+#toast.show{opacity:1;transform:translate(-50%,0)}

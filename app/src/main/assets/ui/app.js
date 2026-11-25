@@ -1,11 +1,12 @@
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
-const B = window.Boxly || { pickZip(){}, pickIcon(){}, clearIcon(){}, build(){}, history: () => '[]', clearHistory(){}, install(){}, share(){} };
+const B = window.Boxly || { pickZip(){}, pickIcon(){}, clearIcon(){}, build(){}, buildUrl(){}, preview(){}, previewUrl(){}, history: () => '[]', clearHistory(){}, install(){}, share(){} };
 const T = {
   'index.html': '<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="utf-8">\n  <meta name="viewport" content="width=device-width,initial-scale=1">\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <h1>Hello, World!</h1>\n  <button id="b">Tap me</button>\n  <script src="script.js"><\/script>\n</body>\n</html>',
   'style.css': 'body{font-family:sans-serif;text-align:center;padding:60px 20px}\nbutton{font-size:18px;padding:12px 24px}',
   'script.js': "document.getElementById('b').onclick = () => {\n  if (window.Android) Android.toast('Hello from Boxly!');\n};"
 };
-let cur = 'index.html', mode = 'code', zipOk = false, last = null, iconUrl = null, shown = 0, raf = 0;
+let cur = 'index.html', mode = 'code', zipOk = false, last = null, iconUrl = null, shown = 0, raf = 0, fix = true, nameTouched = false, lastMode = 'code', tt = 0;
+const MODES = ['code', 'zip', 'url'];
 const defIcon = $('#iprev').innerHTML;
 $('#ed').value = T[cur];
 
@@ -47,12 +48,22 @@ $$('.files button').forEach(b => b.onclick = () => {
 function swap(el) { el.classList.remove('swap'); void el.offsetWidth; el.classList.add('swap'); }
 function setMode(m) {
   mode = m;
-  $('#tab-code').classList.toggle('on', m === 'code'); $('#tab-zip').classList.toggle('on', m === 'zip');
-  $('#spill').style.transform = m === 'zip' ? 'translateX(calc(100% + 4px))' : 'none';
-  $('#pane-code').hidden = m !== 'code'; $('#pane-zip').hidden = m !== 'zip';
-  swap($(m === 'zip' ? '#pane-zip' : '#pane-code'));
+  MODES.forEach(x => { $('#tab-' + x).classList.toggle('on', x === m); $('#pane-' + x).hidden = x !== m; });
+  $('#seg').style.setProperty('--sk', MODES.indexOf(m));
+  $('#fixcard').hidden = m === 'url';
+  $('#incl').textContent = m === 'url' ? 'Opens the live website in your app' : 'Included: Camera · Notifications · File access';
+  swap($('#pane-' + m));
 }
-$('#tab-code').onclick = () => setMode('code'); $('#tab-zip').onclick = () => setMode('zip');
+MODES.forEach(m => $('#tab-' + m).onclick = () => setMode(m));
+$('#fix').onclick = () => { fix = !fix; $('#fix').classList.toggle('on', fix); $('#fix').setAttribute('aria-checked', fix); };
+$('#n').addEventListener('input', () => nameTouched = true);
+const normUrl = () => { const u = $('#url').value.trim(); return !u ? '' : /^[a-z][a-z0-9+.-]*:\/\//i.test(u) ? u : 'https://' + u; };
+$('#url').addEventListener('input', () => {
+  if (nameTouched) return;
+  try { const h = new URL(normUrl()).hostname.replace(/^www\./, '').split('.')[0]; if (h) $('#n').value = h[0].toUpperCase() + h.slice(1); } catch (e) {}
+});
+function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 2800); }
+window.onToast = toast;
 $('#pick').onclick = () => B.pickZip();
 window.onZipPicked = (n, c, kb, hasIndex) => {
   zipOk = hasIndex;
@@ -75,11 +86,19 @@ $('#iclr').onclick = () => {
 };
 
 /* ---------- build ---------- */
+function payload() { T[cur] = $('#ed').value; return mode === 'zip' ? 'zip' : JSON.stringify(T); }
+function begin() { lastMode = mode; $('#err').hidden = true; shown = 0; setP(0, 5); show('building'); }
 $('#build').onclick = () => {
-  T[cur] = $('#ed').value;
+  if (mode === 'url') { const u = normUrl(); if (!u) return toast('Enter a website address'); begin(); return B.buildUrl($('#n').value, u); }
+  const j = payload();
   if (mode === 'zip' && !zipOk) { $('#zipinfo').textContent = 'Choose a ZIP that contains index.html'; return; }
-  $('#err').hidden = true; shown = 0; setP(0, 5); show('building');
-  B.build($('#n').value, mode === 'zip' ? 'zip' : JSON.stringify(T));
+  begin(); B.build($('#n').value, j, fix);
+};
+$('#prev').onclick = () => {
+  if (mode === 'url') { const u = normUrl(); return u ? B.previewUrl(u) : toast('Enter a website address'); }
+  const j = payload();
+  if (mode === 'zip' && !zipOk) return toast('Choose a ZIP first');
+  B.preview(j, fix);
 };
 function tween(to) {
   cancelAnimationFrame(raf);
@@ -101,7 +120,7 @@ const kb = b => b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.round(b / 
 window.onDone = info => {
   last = info; setP(4, 100);
   $('#dn').textContent = info.name;
-  $('#dm').textContent = kb(info.size) + ' · ' + info.pkg + (iconUrl && !info.iconApplied ? ' · icon not applied' : '');
+  $('#dm').textContent = kb(info.size) + ' · ' + info.pkg + (iconUrl && !info.iconApplied ? ' · icon not applied' : '') + (info.fixed ? ' · mobile fix' : '') + (lastMode === 'url' ? ' · website' : '');
   $('#dlogo').innerHTML = iconUrl && info.iconApplied ? '<img alt="" src="' + iconUrl + '">' : '<svg class="i"><use href="#i-box"/></svg>';
   setTimeout(() => { show('done'); burst(); }, 700);
 };

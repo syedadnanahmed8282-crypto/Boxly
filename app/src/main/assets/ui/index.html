@@ -6,6 +6,8 @@
 <symbol id="i-logo" viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M13 7l-3.5 5.5h3L11 17l3.5-5.5h-3z"/></symbol>
 <symbol id="i-code" viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></symbol>
 <symbol id="i-zip" viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></symbol>
+<symbol id="i-globe" viewBox="0 0 24 24"><path d="M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 100 6 3 3 0 000-6z"/></symbol>
 <symbol id="i-dl" viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 19h14"/></symbol>
 <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 16V4m0 0L8 8m4-4l4 4M5 20h14"/></symbol>
 <symbol id="i-ok" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></symbol>
@@ -18,11 +20,14 @@
 
 <section class="scr" id="home">
  <div class="row" style="margin-top:6px"><div class="logo"><svg class="i"><use href="#i-logo"/></svg></div><div><div class="t1">Boxly</div><div class="mut">Turn web into apps</div></div></div>
- <div class="seg glass"><i class="spill" id="spill"></i><button id="tab-code" class="on"><svg class="i"><use href="#i-code"/></svg>Code</button><button id="tab-zip"><svg class="i"><use href="#i-zip"/></svg>ZIP</button></div>
+ <div class="seg glass" id="seg"><i class="spill"></i><button id="tab-code" class="on"><svg class="i"><use href="#i-code"/></svg>Code</button><button id="tab-zip"><svg class="i"><use href="#i-zip"/></svg>ZIP</button><button id="tab-url"><svg class="i"><use href="#i-globe"/></svg>URL</button></div>
  <div id="pane-code" class="code"><div class="files"><button class="on" data-f="index.html">index.html</button><button data-f="style.css">style.css</button><button data-f="script.js">script.js</button></div><textarea id="ed" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" aria-label="Code editor"></textarea></div>
  <div id="pane-zip" hidden><button class="drop" id="pick"><span class="ib" style="color:#fff"><svg class="i"><use href="#i-up"/></svg></span><b>Choose your project ZIP</b><span class="mut" id="zipinfo">index.html must be inside the ZIP</span></button></div>
+ <div id="pane-url" class="glass det" style="grid-template-columns:1fr" hidden><div><label for="url">Website address</label><input id="url" type="url" inputmode="url" placeholder="https://example.com" autocapitalize="off" autocorrect="off" spellcheck="false"></div><div class="mut">Your app opens this website full-screen. Needs internet.</div></div>
+ <div class="glass fixc" id="fixcard"><div class="grow"><b>Mobile fix</b><span class="mut">Adds the viewport tag and safe styles so pages fit the screen</span></div><button class="sw on" id="fix" role="switch" aria-checked="true" aria-label="Mobile fix"><i></i></button></div>
  <div class="glass icard"><div class="ipv" id="iprev"><svg class="i" style="width:28px;height:28px"><use href="#i-logo"/></svg></div><div class="grow"><b>App icon</b><span class="mut" id="ihint">Default Boxly icon</span></div><button class="tag" id="iclr" hidden>Reset</button><button class="tag" id="ipick">Choose logo</button></div>
- <div class="glass det" style="grid-template-columns:1fr"><div><label for="n">App name</label><input id="n" value="My Awesome App" maxlength="32"></div><div class="mut">Included: Camera · Notifications · File access</div></div>
+ <div class="glass det" style="grid-template-columns:1fr"><div><label for="n">App name</label><input id="n" value="My Awesome App" maxlength="32"></div><div class="mut" id="incl">Included: Camera · Notifications · File access</div></div>
+ <button class="btn ghost" id="prev"><svg class="i"><use href="#i-eye"/></svg>Preview</button>
  <button class="btn pulse" id="build"><svg class="i"><use href="#i-dl"/></svg>Build APK</button>
 </section>
 
@@ -53,11 +58,11 @@
 
 <section class="scr" id="settings"><div class="h1" style="margin-top:6px">Settings</div>
  <div class="sec">Signing</div>
- <div class="glass list"><div class="it"><div class="grow"><b>Signing key</b><span class="mut">Created and kept on this device (Android Keystore)</span></div></div><div class="it"><div class="grow"><b>Version</b><span class="mut">Boxly 2.0.0</span></div></div></div>
+ <div class="glass list"><div class="it"><div class="grow"><b>Signing key</b><span class="mut">Created and kept on this device (Android Keystore)</span></div></div><div class="it"><div class="grow"><b>Version</b><span class="mut">Boxly 3.0.0</span></div></div></div>
  <div class="sec">Tips</div>
- <div class="glass it"><div class="grow"><b>App icon</b><span class="mut">A square PNG with a transparent background looks best.</span></div></div>
+ <div class="glass list"><div class="it"><div class="grow"><b>App icon</b><span class="mut">A square PNG with a transparent background looks best.</span></div></div><div class="it"><div class="grow"><b>Website apps</b><span class="mut">URL apps load the live site, so they need internet. Some sites (like Google sign-in) block in-app browsers.</span></div></div></div>
  <div class="sec">Native API for your apps</div>
- <div class="glass api">Android.toast("Hi")<br>Android.vibrate(200)<br>Android.showNotification("Title","Body")<br>Android.share("text")<br>Android.saveFile("a.txt","text/plain",base64)<br>&lt;input type="file" accept="image/*"&gt; opens camera or files</div>
+ <div class="glass api">Android.toast("Hi")<br>Android.vibrate(200)<br>Android.showNotification("Title","Body")<br>Android.share("text")<br>Android.saveFile("a.txt","text/plain",base64)<br>&lt;input type="file" accept="image/*"&gt; opens camera or files<br><br>(Code/ZIP apps only. Website apps have no native bridge.)</div>
  <button class="btn ghost" id="clr">Clear history</button>
 </section>
 
@@ -66,7 +71,7 @@
  <button id="n-history"><svg class="i"><use href="#i-clock"/></svg>History</button>
  <button id="n-settings"><svg class="i"><use href="#i-set"/></svg>Settings</button>
 </div>
-
+<div id="toast" role="status"></div>
 <div id="splash"><div class="logo"><svg class="i"><use href="#i-logo"/></svg></div><div class="sp-name">Boxly</div><div class="sp-sub">Turn web into apps</div></div>
 </div>
 <script src="app.js"></script>

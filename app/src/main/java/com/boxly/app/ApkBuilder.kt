@@ -40,7 +40,7 @@ object ApkBuilder {
         return if (s.isEmpty()) "My App" else s
     }
 
-    fun build(ctx: Context, name: String, files: Map<String, ByteArray>, icon: IconAssets?, progress: (Int, Int) -> Unit): BuildResult {
+    fun build(ctx: Context, name: String, files: Map<String, ByteArray>, icon: IconAssets?, url: String?, progress: (Int, Int) -> Unit): BuildResult {
         progress(0, 10)
         val label = cleanLabel(name)
         val pkg = newPackageId()
@@ -50,7 +50,7 @@ object ApkBuilder {
         val out = File(dir, "${safe}_${System.currentTimeMillis()}.apk")
 
         val iconOk = patch(File(ctx.applicationInfo.sourceDir), tmp, label, pkg, files, icon,
-            resPath(ctx, R.drawable.ic_launcher_fg), resPath(ctx, R.drawable.ic_launcher_bg))
+            resPath(ctx, R.drawable.ic_launcher_fg), resPath(ctx, R.drawable.ic_launcher_bg), url)
         progress(2, 65)
         sign(tmp, out)
         tmp.delete()
@@ -65,7 +65,7 @@ object ApkBuilder {
 
     private fun patch(
         base: File, out: File, label: String, pkg: String, files: Map<String, ByteArray>,
-        icon: IconAssets?, fgPath: String?, bgPath: String?
+        icon: IconAssets?, fgPath: String?, bgPath: String?, url: String?
     ): Boolean {
         var iconHits = 0
         ZipFile(base).use { zf ->
@@ -74,7 +74,7 @@ object ApkBuilder {
                     val n = e.name
                     if (e.isDirectory) continue
                     if (n.startsWith("META-INF/") && (n.endsWith(".MF") || n.endsWith(".SF") || n.endsWith(".RSA") || n.endsWith(".DSA") || n.endsWith(".EC"))) continue
-                    if (n.startsWith("assets/www/") || n.startsWith("assets/ui/") || n == "assets/boxly_runner") continue
+                    if (n.startsWith("assets/www/") || n.startsWith("assets/ui/") || n == "assets/boxly_runner" || n == "assets/boxly_url") continue
                     var data = zf.getInputStream(e).readBytes()
                     if (icon != null && n == fgPath) { data = icon.fg; iconHits++ }
                     else if (icon != null && n == bgPath) { data = icon.bg; iconHits++ }
@@ -87,6 +87,7 @@ object ApkBuilder {
                     zos.putNextEntry(ZipEntry(n)); zos.write(data); zos.closeEntry()
                 }
                 zos.putNextEntry(ZipEntry("assets/boxly_runner")); zos.closeEntry()
+                if (url != null) { zos.putNextEntry(ZipEntry("assets/boxly_url")); zos.write(url.toByteArray()); zos.closeEntry() }
                 for ((p, b) in files) {
                     zos.putNextEntry(ZipEntry("assets/www/" + p.trimStart('/')))
                     zos.write(b); zos.closeEntry()

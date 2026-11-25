@@ -12,10 +12,13 @@ import android.os.Bundle
 import android.os.Vibrator
 import android.provider.MediaStore
 import android.util.Base64
+import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
+import android.webkit.MimeTypeMap
 import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -23,22 +26,48 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import androidx.webkit.WebViewAssetLoader
+import java.io.ByteArrayInputStream
 import java.io.File
 
-/** Runs the user's HTML/CSS/JS (assets/www) and exposes a small native bridge as window.Android. */
+/**
+ * Runs either local files (assets/www, or in-memory files for Preview) or a remote website (assets/boxly_url).
+ * Local mode gets the full `Android` JS bridge; website mode only gets a retry button (no native access for remote pages).
+ */
 class RunnerActivity : Activity() {
     private lateinit var web: WebView
     private var fileCb: ValueCallback<Array<Uri>>? = null
     private var camFile: File? = null
     private var pendingPerm: PermissionRequest? = null
     private var saveBytes: ByteArray? = null
+    private var remoteUrl: String? = null
+
+    private fun readAsset(name: String): String? = runCatching {
+        assets.open(name).bufferedReader().use { it.readText().trim() }
+    }.getOrNull()?.takeIf { it.isNotEmpty() }
+
+    private fun serve(path: String): WebResourceResponse? {
+        var p = path.trimStart('/')
+        if (p.isEmpty() || p.endsWith("/")) p += "index.html"
+        val b = PreviewStore.files[p]
+            ?: return WebResourceResponse("text/plain", "utf-8", 404, "Not Found", emptyMap(), ByteArrayInputStream(ByteArray(0)))
+        val ext = p.substringAfterLast('.', "").lowercase()
+        val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "application/octet-stream"
+        val text = mime.startsWith("text/") || mime.contains("javascript") || mime.contains("json") || mime.contains("xml")
+        return WebResourceResponse(mime, if (text) "utf-8" else null, ByteArrayInputStream(b))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val preview = intent.getBooleanExtra("preview", false)
+        remoteUrl = intent.getStringExtra("url") ?: if (!preview) readAsset("boxly_url") else null
+
         web = WebView(this)
         setContentView(web)
-        val loader = WebViewAssetLoader.Builder()
-            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this)).build()
+        val lb = WebViewAssetLoader.Builder()
+        if (preview) lb.addPathHandler("/assets/www/", WebViewAssetLoader.PathHandler { path -> serve(path) })
+        else lb.addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+        val loader = lb.build()
+
         with(web.settings) {
             javaScriptEnabled = true
             domStorageEnabled = true
@@ -46,16 +75,29 @@ class RunnerActivity : Activity() {
             allowFileAccess = false
             allowContentAccess = false
         }
+        if (remoteUrl != null) CookieManager.getInstance().setAcceptThirdPartyCookies(web, true)
+        web.setDownloadListener { url, _, _, _, _ -> runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } }
+
         web.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
                 loader.shouldInterceptRequest(request.url)
 
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                if (request.url.host == "appassets.androidplatform.net") return false
-                runCatching { startActivity(Intent(Intent.ACTION_VIEW, request.url)) }
+                val u = request.url
+                if (u.host == "appassets.androidplatform.net") return false
+                val scheme = u.scheme ?: ""
+                if (remoteUrl != null && (scheme == "http" || scheme == "https")) return false
+                runCatching { startActivity(Intent(Intent.ACTION_VIEW, u)) }
                 return true
             }
+
+            override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+                if (request.isForMainFrame && remoteUrl != null) {
+                    view.loadDataWithBaseURL(null, OFFLINE_HTML, "text/html", "utf-8", null)
+                }
+            }
         }
+
         web.webChromeClient = object : WebChromeClient() {
             override fun onShowFileChooser(w: WebView, cb: ValueCallback<Array<Uri>>, p: FileChooserParams): Boolean {
                 fileCb?.onReceiveValue(null)
@@ -82,7 +124,8 @@ class RunnerActivity : Activity() {
 
             override fun onPermissionRequest(r: PermissionRequest) {
                 runOnUiThread {
-                    if (r.resources.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
+                    val originOk = remoteUrl == null || r.origin.host == Uri.parse(remoteUrl).host
+                    if (originOk && r.resources.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
                         if (checkSelfPermission(android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
                             r.grant(arrayOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE))
                         } else {
@@ -93,8 +136,10 @@ class RunnerActivity : Activity() {
                 }
             }
         }
-        web.addJavascriptInterface(NativeBridge(), "Android")
-        web.loadUrl("https://appassets.androidplatform.net/assets/www/index.html")
+
+        if (remoteUrl != null) web.addJavascriptInterface(RetryBridge(), "Android")
+        else web.addJavascriptInterface(NativeBridge(), "Android")
+        web.loadUrl(remoteUrl ?: "https://appassets.androidplatform.net/assets/www/index.html")
     }
 
     override fun onRequestPermissionsResult(code: Int, perms: Array<out String>, res: IntArray) {
@@ -125,6 +170,10 @@ class RunnerActivity : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() { if (web.canGoBack()) web.goBack() else super.onBackPressed() }
 
+    inner class RetryBridge {
+        @JavascriptInterface fun retry() { runOnUiThread { remoteUrl?.let { web.loadUrl(it) } } }
+    }
+
     inner class NativeBridge {
         @JavascriptInterface fun toast(msg: String) { runOnUiThread { Toast.makeText(this@RunnerActivity, msg, Toast.LENGTH_SHORT).show() } }
 
@@ -153,5 +202,14 @@ class RunnerActivity : Activity() {
                     .setType(mime).putExtra(Intent.EXTRA_TITLE, name), 2)
             }
         }
+    }
+
+    companion object {
+        private const val OFFLINE_HTML = "<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'>" +
+            "<body style='margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;" +
+            "font-family:sans-serif;background:#F7F3FF;color:#1E1B3A;text-align:center;padding:24px;box-sizing:border-box'>" +
+            "<div style='font-size:22px;font-weight:800'>No connection</div><div style='opacity:.7'>Check your internet and try again.</div>" +
+            "<button onclick='Android.retry()' style='border:0;border-radius:16px;padding:14px 28px;font-size:16px;font-weight:700;color:#fff;" +
+            "background:linear-gradient(100deg,#6A44F0,#C92F78)'>Retry</button></body>"
     }
 }

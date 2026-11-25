@@ -4,16 +4,23 @@ import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.provider.Settings
+import android.view.WindowManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.core.content.FileProvider
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.webkit.WebViewAssetLoader
 import org.json.JSONArray
 import org.json.JSONObject
@@ -24,17 +31,45 @@ class BuilderActivity : Activity() {
     private lateinit var web: WebView
     private var zipFiles: Map<String, ByteArray>? = null
     private var icon: IconAssets? = null
+    private var insetsJs = ""
     private val prefs by lazy { getSharedPreferences("boxly", MODE_PRIVATE) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Edge-to-edge: draw behind status + navigation bars, the page pads itself with --sat / --sab.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.TRANSPARENT
+        if (Build.VERSION.SDK_INT >= 29) window.isNavigationBarContrastEnforced = false
+        if (Build.VERSION.SDK_INT >= 28) {
+            window.attributes = window.attributes.apply { layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES }
+        }
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            isAppearanceLightStatusBars = true
+            isAppearanceLightNavigationBars = true
+        }
+
         web = WebView(this)
+        web.setBackgroundColor(0xFFF7F3FF.toInt())
         setContentView(web)
+        ViewCompat.setOnApplyWindowInsetsListener(web) { _, ins ->
+            val b = ins.getInsets(WindowInsetsCompat.Type.systemBars())
+            val d = resources.displayMetrics.density
+            insetsJs = "document.documentElement.style.setProperty('--sat','${b.top / d}px');" +
+                "document.documentElement.style.setProperty('--sab','${b.bottom / d}px');"
+            web.evaluateJavascript(insetsJs, null)
+            ins
+        }
+
         val loader = WebViewAssetLoader.Builder()
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this)).build()
         web.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
                 loader.shouldInterceptRequest(request.url)
+
+            override fun onPageFinished(view: WebView, url: String?) {
+                if (insetsJs.isNotEmpty()) view.evaluateJavascript(insetsJs, null)
+            }
         }
         web.settings.javaScriptEnabled = true
         web.settings.allowFileAccess = false
@@ -99,11 +134,37 @@ class BuilderActivity : Activity() {
             ?: throw IllegalStateException("Could not read this image (use PNG or JPG)")
     }
 
+    private fun normUrl(u: String): String {
+        var s = u.trim()
+        if (!Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://").containsMatchIn(s)) s = "https://$s"
+        val uri = Uri.parse(s)
+        val scheme = uri.scheme?.lowercase()
+        if ((scheme != "http" && scheme != "https") || uri.host.isNullOrEmpty()) throw IllegalStateException("Enter a valid website address")
+        return s
+    }
+
+    private fun collect(json: String): Map<String, ByteArray> =
+        if (json == "zip") zipFiles ?: throw IllegalStateException("Choose a ZIP first")
+        else JSONObject(json).let { o -> o.keys().asSequence().associateWith { o.getString(it).toByteArray() } }
+
+    private fun runBuild(name: String, files: Map<String, ByteArray>, url: String?, fixed: Int) {
+        val r = ApkBuilder.build(this, name, files, icon, url) { step, pct -> js("onProgress($step,$pct)") }
+        val info = JSONObject().put("name", r.label).put("pkg", r.pkg).put("path", r.file.path)
+            .put("size", r.file.length()).put("time", System.currentTimeMillis())
+            .put("iconApplied", r.iconApplied).put("fixed", fixed)
+        val old = JSONArray(prefs.getString("h", "[]"))
+        val list = JSONArray().put(info)
+        for (i in 0 until minOf(old.length(), 19)) list.put(old.get(i))
+        prefs.edit().putString("h", list.toString()).apply()
+        js("onDone($info)")
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         val uri = data?.data
-        if (requestCode == 1 && resultCode == RESULT_OK && uri != null) {
+        if (resultCode != RESULT_OK || uri == null) return
+        if (requestCode == 1) {
             Thread {
                 try {
                     val files = readZip(uri)
@@ -119,7 +180,7 @@ class BuilderActivity : Activity() {
                     js("onZipError(${JSONObject.quote(e.message ?: "Could not read ZIP")})")
                 }
             }.start()
-        } else if (requestCode == 2 && resultCode == RESULT_OK && uri != null) {
+        } else if (requestCode == 2) {
             Thread {
                 try {
                     val bmp = decodeImage(uri)
@@ -137,16 +198,6 @@ class BuilderActivity : Activity() {
 
     inner class Bridge {
         @JavascriptInterface
-        fun pickIcon() = runOnUiThread {
-            @Suppress("DEPRECATION")
-            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                addCategory(Intent.CATEGORY_OPENABLE); type = "image/*"
-            }, 2)
-        }
-
-        @JavascriptInterface fun clearIcon() { icon = null }
-
-        @JavascriptInterface
         fun pickZip() = runOnUiThread {
             @Suppress("DEPRECATION")
             startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
@@ -156,28 +207,64 @@ class BuilderActivity : Activity() {
         }
 
         @JavascriptInterface
-        fun build(name: String, json: String) {
+        fun pickIcon() = runOnUiThread {
+            @Suppress("DEPRECATION")
+            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE); type = "image/*"
+            }, 2)
+        }
+
+        @JavascriptInterface fun clearIcon() { icon = null }
+
+        /** Code or ZIP project -> APK. json is "zip" or {"index.html": "...", ...}. */
+        @JavascriptInterface
+        fun build(name: String, json: String, mobileFix: Boolean) {
             Thread {
                 try {
-                    val files: Map<String, ByteArray> = if (json == "zip") {
-                        zipFiles ?: throw IllegalStateException("Choose a ZIP first")
-                    } else {
-                        val o = JSONObject(json)
-                        o.keys().asSequence().associateWith { o.getString(it).toByteArray() }
-                    }
+                    var files = collect(json)
+                    var fixed = 0
+                    if (mobileFix) { val r = MobileFix.apply(files); files = r.first; fixed = r.second }
                     if (!files.containsKey("index.html")) throw IllegalStateException("index.html was not found in your project")
-                    val r = ApkBuilder.build(this@BuilderActivity, name, files, icon) { step, pct -> js("onProgress($step,$pct)") }
-                    val info = JSONObject().put("name", r.label).put("pkg", r.pkg).put("path", r.file.path)
-                        .put("size", r.file.length()).put("time", System.currentTimeMillis()).put("iconApplied", r.iconApplied)
-                    val old = JSONArray(prefs.getString("h", "[]"))
-                    val list = JSONArray().put(info)
-                    for (i in 0 until minOf(old.length(), 19)) list.put(old.get(i))
-                    prefs.edit().putString("h", list.toString()).apply()
-                    js("onDone($info)")
+                    runBuild(name, files, null, fixed)
                 } catch (e: Throwable) {
                     js("onError(${JSONObject.quote(e.message ?: e.toString())})")
                 }
             }.start()
+        }
+
+        /** Website URL -> APK that opens the site full-screen. */
+        @JavascriptInterface
+        fun buildUrl(name: String, url: String) {
+            Thread {
+                try { runBuild(name, emptyMap(), normUrl(url), 0) }
+                catch (e: Throwable) { js("onError(${JSONObject.quote(e.message ?: e.toString())})") }
+            }.start()
+        }
+
+        /** Open the project in the real runner WebView without building. */
+        @JavascriptInterface
+        fun preview(json: String, mobileFix: Boolean) {
+            Thread {
+                try {
+                    var files = collect(json)
+                    if (mobileFix) files = MobileFix.apply(files).first
+                    if (!files.containsKey("index.html")) throw IllegalStateException("index.html was not found in your project")
+                    PreviewStore.files = files
+                    runOnUiThread { startActivity(Intent(this@BuilderActivity, RunnerActivity::class.java).putExtra("preview", true)) }
+                } catch (e: Throwable) {
+                    js("onToast(${JSONObject.quote(e.message ?: e.toString())})")
+                }
+            }.start()
+        }
+
+        @JavascriptInterface
+        fun previewUrl(url: String) {
+            try {
+                val u = normUrl(url)
+                runOnUiThread { startActivity(Intent(this@BuilderActivity, RunnerActivity::class.java).putExtra("url", u)) }
+            } catch (e: Throwable) {
+                js("onToast(${JSONObject.quote(e.message ?: e.toString())})")
+            }
         }
 
         @JavascriptInterface fun history(): String = prefs.getString("h", "[]") ?: "[]"

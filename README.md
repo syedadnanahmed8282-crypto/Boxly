@@ -25,3 +25,9 @@ Local build: open the folder in Android Studio, or run `gradle assembleRelease` 
 ## New in v2
 - Custom app icon: pick any PNG/JPG; it becomes the launcher icon of the generated app (transparent PNG works best).
 - New animations: splash, sliding tabs/nav, staggered screens, ripples, shimmer button, orbiting build ring, confetti.
+
+## New in v3
+- **URL mode**: type any website address; the APK opens that site full-screen (needs internet). Website apps get no native JS bridge, and camera is only granted to the site's own origin.
+- **Preview**: opens your Code/ZIP project (or website) in the real runner WebView before you build.
+- **Mobile fix** toggle: injects a viewport tag (if missing) and safe styles into every HTML file at build/preview time.
+- Edge-to-edge Boxly UI (draws behind status and navigation bars).
