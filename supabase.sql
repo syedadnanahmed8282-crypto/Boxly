@@ -44,22 +44,31 @@ begin
   end if;
 end $$;
 
-create or replace function public.get_app_config(p_version int default 0)
+alter table public.app_config add column if not exists allowed_version text not null default '';  -- e.g. '6.0.0': every other version gets the popup ('' = off)
+
+drop function if exists public.get_app_config(int);
+create or replace function public.get_app_config(p_version int default 0, p_version_name text default '')
 returns json language sql stable security definer set search_path = public as $$
   select json_build_object(
-    'blocking', (blocking or p_version < min_version),
+    'blocking', (
+      blocking
+      or p_version < min_version
+      or (allowed_version <> '' and coalesce(nullif(p_version_name, ''), p_version::text || '.0.0') <> allowed_version)
+    ),
     'title', title, 'message', message,
     'contact_label', contact_label, 'contact_link', contact_link)
   from app_config where id = 1;
 $$;
 
 revoke all on function public.register_install(uuid, text, text, text) from public;
-revoke all on function public.get_app_config(int) from public;
+revoke all on function public.get_app_config(int, text) from public;
 grant execute on function public.register_install(uuid, text, text, text) to anon, authenticated;
-grant execute on function public.get_app_config(int) to anon, authenticated;
+grant execute on function public.get_app_config(int, text) to anon, authenticated;
 
 -- ===== Handy commands (run any time) =====
 -- Show popup now:   update app_config set blocking = true, message = 'নতুন আপডেট এসেছে। আপডেট না করলে ব্যবহার করা যাবে না। নতুন APK-র জন্য যোগাযোগ করুন।', contact_link = 'https://t.me/yourname' where id = 1;
 -- Hide popup:       update app_config set blocking = false where id = 1;
 -- Count users:      select count(*) from installs;
 -- See users:        select user_no, device, android, app_version, first_seen, last_seen, opens from installs order by user_no;
+-- Only version 6.0.0 may run (all others see the popup):  update app_config set allowed_version = '6.0.0' where id = 1;
+-- Turn the version rule off:                              update app_config set allowed_version = '' where id = 1;

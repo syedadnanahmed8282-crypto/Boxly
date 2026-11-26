@@ -13,13 +13,25 @@ android {
         minSdk = 26
         // 29 on purpose: resources.arsc may be recompressed when we repack the APK.
         targetSdk = 29
-        versionCode = 3
-        versionName = "3.0.0"
+        versionCode = 4
+        versionName = "4.0.0"
+    }
+    signingConfigs {
+        // Same key on every GitHub build (from repo secrets), so new APKs can update old installs.
+        create("boxly") {
+            val ks = System.getenv("BOXLY_KEYSTORE")
+            if (ks != null && file(ks).exists()) {
+                storeFile = file(ks)
+                storePassword = System.getenv("BOXLY_STORE_PASSWORD")
+                keyAlias = System.getenv("BOXLY_KEY_ALIAS")
+                keyPassword = System.getenv("BOXLY_STORE_PASSWORD")
+            }
+        }
     }
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (System.getenv("BOXLY_KEYSTORE") != null) signingConfigs.getByName("boxly") else signingConfigs.getByName("debug")
         }
     }
     compileOptions {

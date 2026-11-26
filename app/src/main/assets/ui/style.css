@@ -172,3 +172,4 @@ button.sw{flex:none}
 @keyframes fadeIn{from{opacity:0}}
 .gcard.glass{background:linear-gradient(145deg,#fff,#F7F3FF)}
 #gate{background:rgba(30,27,58,.72)}
+.sp-by{position:absolute;left:0;right:0;bottom:calc(30px + var(--sab,0px));text-align:center;font-size:13px;font-weight:600;letter-spacing:.3px;opacity:.9;animation:rise2 .7s 1s both}

@@ -15,10 +15,21 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
-      - name: Ensure debug keystore
+      - name: Prepare signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
           mkdir -p ~/.android
-          [ -f ~/.android/debug.keystore ] || keytool -genkeypair -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/boxly.jks"
+            echo "BOXLY_KEYSTORE=$RUNNER_TEMP/boxly.jks" >> "$GITHUB_ENV"
+            echo "BOXLY_STORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "BOXLY_KEY_ALIAS=boxly" >> "$GITHUB_ENV"
+          else
+            echo "No KEYSTORE_BASE64 secret: using a temporary debug key (updates over old installs will NOT work)"
+            [ -f ~/.android/debug.keystore ] || keytool -genkeypair -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
       - name: Build release APK
         run: gradle assembleRelease --no-daemon
       - uses: actions/upload-artifact@v4

@@ -71,7 +71,7 @@ object Telemetry {
         val app = ctx.applicationContext
         Thread {
             val json = try {
-                val o = JSONObject(post("get_app_config", JSONObject().put("p_version", versionCode(app))))
+                val o = JSONObject(post("get_app_config", JSONObject().put("p_version", versionCode(app)).put("p_version_name", pkgInfo(app).versionName ?: "")))
                 val clean = JSONObject()
                     .put("blocking", o.optBoolean("blocking"))
                     .put("title", o.optString("title"))
