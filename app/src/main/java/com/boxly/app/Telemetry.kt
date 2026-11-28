@@ -80,12 +80,30 @@ object Telemetry {
         }
     }
 
-    /** Calls back with a clean JSON object string. Falls back to the last known config when offline. */
-    fun fetchConfig(ctx: Context, cb: (String) -> Unit) {
+    private const val DEFAULT_MAX_OFFLINE_HOURS = 48
+
+    /** True when the app has gone too long without a successful check (or the clock was turned back). */
+    private fun offlineExpired(ctx: Context, cfg: JSONObject?): Boolean {
+        val p = prefs(ctx)
+        val limitH = cfg?.optInt("max_offline_hours", DEFAULT_MAX_OFFLINE_HOURS) ?: DEFAULT_MAX_OFFLINE_HOURS
+        if (limitH <= 0) return false
+        val ref = p.getLong("last_ok", 0L).takeIf { it > 0 } ?: p.getLong("first_run", 0L)
+        if (ref <= 0) return false
+        val elapsed = System.currentTimeMillis() - ref
+        return elapsed < 0 || elapsed > limitH * 3_600_000L
+    }
+
+    /**
+     * cb(json, ok): ok = true when Supabase answered.
+     * Offline for longer than max_offline_hours => a blocking "turn on the internet" config.
+     */
+    fun fetchConfig(ctx: Context, cb: (String, Boolean) -> Unit) {
         if (!enabled) return
         val app = ctx.applicationContext
+        val p = prefs(app)
+        if (p.getLong("first_run", 0L) == 0L) p.edit().putLong("first_run", System.currentTimeMillis()).apply()
         Thread {
-            val json = try {
+            try {
                 val o = JSONObject(post("get_app_config", JSONObject().put("p_version", versionCode(app)).put("p_version_name", pkgInfo(app).versionName ?: "")))
                 val clean = JSONObject()
                     .put("blocking", o.optBoolean("blocking"))
@@ -93,13 +111,24 @@ object Telemetry {
                     .put("message", o.optString("message"))
                     .put("contact_label", o.optString("contact_label"))
                     .put("contact_link", o.optString("contact_link"))
+                    .put("max_offline_hours", o.optInt("max_offline_hours", DEFAULT_MAX_OFFLINE_HOURS))
                     .toString()
-                prefs(app).edit().putString("cfg", clean).apply()
-                clean
+                p.edit().putString("cfg", clean).putLong("last_ok", System.currentTimeMillis()).apply()
+                cb(clean, true)
             } catch (e: Throwable) {
-                prefs(app).getString("cfg", null)
+                val cached = p.getString("cfg", null)?.let { runCatching { JSONObject(it) }.getOrNull() }
+                if (offlineExpired(app, cached)) {
+                    val j = JSONObject()
+                        .put("blocking", true)
+                        .put("title", "ইন্টারনেট চালু করুন")
+                        .put("message", "চালিয়ে যেতে ইন্টারনেট দরকার। ইন্টারনেট চালু করে নিচের বোতাম চাপুন।")
+                        .put("contact_label", "")
+                        .put("contact_link", "")
+                    cb(j.toString(), false)
+                } else if (cached != null) {
+                    cb(cached.toString(), false)
+                }
             }
-            if (json != null) cb(json)
         }.start()
     }
 }

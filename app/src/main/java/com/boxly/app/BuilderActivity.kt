@@ -117,7 +117,8 @@ class BuilderActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        checkConfig()
+        handler.removeCallbacks(cfgLoop)
+        handler.post(cfgLoop)
         lastBeat = SystemClock.elapsedRealtime()
         Telemetry.usage(this, 0, true)
         handler.postDelayed(beat, 30_000)
@@ -126,12 +127,23 @@ class BuilderActivity : Activity() {
     override fun onPause() {
         super.onPause()
         handler.removeCallbacks(beat)
+        handler.removeCallbacks(cfgLoop)
         flushUsage()
     }
 
     /** Remote popup: asks Supabase whether the app must show the "update required" screen. */
+    private var cfgOk = true
+    // While the app is open: re-check every 30 s (every 10 s while offline) so the popup appears as soon as the internet is back.
+    private val cfgLoop = object : Runnable {
+        override fun run() {
+            checkConfig()
+            handler.postDelayed(this, if (cfgOk) 30_000 else 10_000)
+        }
+    }
+
     private fun checkConfig() {
-        Telemetry.fetchConfig(this) { json ->
+        Telemetry.fetchConfig(this) { json, ok ->
+            cfgOk = ok
             cfgJs = "window.onAppConfig && window.onAppConfig($json);"
             runOnUiThread { web.evaluateJavascript(cfgJs, null) }
         }
