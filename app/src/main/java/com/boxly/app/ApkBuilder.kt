@@ -5,12 +5,13 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.TypedValue
 import com.android.apksig.ApkSigner
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.math.BigInteger
 import java.security.KeyPairGenerator
 import java.security.KeyStore
+import java.security.MessageDigest
 import java.security.PrivateKey
-import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import java.util.Date
 import java.util.zip.ZipEntry
@@ -22,28 +23,33 @@ data class BuildResult(val label: String, val pkg: String, val file: File, val i
 
 /**
  * Builds a new APK by copying this app's own APK, swapping assets/www, patching the package id and
- * label in-place (same length) inside the binary manifest, then signing with a key kept in Android Keystore.
+ * label inside the binary manifest, then signing (your own imported key, or a key kept in Android Keystore).
+ * The package id comes from the app name, so building the same name again UPDATES the installed app (data is kept).
  */
 object ApkBuilder {
     const val PKG_PLACEHOLDER = "com.boxly.pkg00000000"
     val LABEL_PLACEHOLDER = "Boxly".padEnd(32)
     private const val ALIAS = "boxly_signing_key"
+    private const val PREFS = "boxly"
 
-    fun newPackageId(): String {
-        val c = "abcdefghijklmnopqrstuvwxyz0123456789"
-        val r = SecureRandom()
-        return "com.boxly.pkg" + (1..8).map { c[r.nextInt(c.length)] }.joinToString("")
+    /** Same name (ignoring case and extra spaces) always gives the same package id. */
+    fun packageIdFor(label: String): String {
+        val norm = label.trim().lowercase().replace(Regex("\\s+"), " ")
+        val h = MessageDigest.getInstance("SHA-256").digest(norm.toByteArray(Charsets.UTF_8))
+        return "com.boxly.pkg" + h.take(4).joinToString("") { "%02x".format(it) }
     }
 
     fun cleanLabel(n: String): String {
-        val s = n.trim().filter { it.code in 32..126 }.take(32).trim()
+        var s = n.filter { !it.isISOControl() }.trim().take(32)
+        if (s.isNotEmpty() && s.last().isHighSurrogate()) s = s.dropLast(1)
+        s = s.trim()
         return if (s.isEmpty()) "My App" else s
     }
 
     fun build(ctx: Context, name: String, files: Map<String, ByteArray>, icon: IconAssets?, url: String?, progress: (Int, Int) -> Unit): BuildResult {
         progress(0, 10)
         val label = cleanLabel(name)
-        val pkg = newPackageId()
+        val pkg = packageIdFor(label)
         val dir = File(ctx.filesDir, "apks").apply { mkdirs() }
         val tmp = File(ctx.cacheDir, "patched.apk")
         val safe = label.replace(Regex("[^A-Za-z0-9]+"), "_").trim('_').ifEmpty { "app" }
@@ -52,7 +58,7 @@ object ApkBuilder {
         val iconOk = patch(File(ctx.applicationInfo.sourceDir), tmp, label, pkg, files, icon,
             resPath(ctx, R.drawable.ic_launcher_fg), resPath(ctx, R.drawable.ic_launcher_bg), url)
         progress(2, 65)
-        sign(tmp, out)
+        sign(ctx, tmp, out)
         tmp.delete()
         progress(3, 100)
         return BuildResult(label, pkg, out, iconOk)
@@ -78,9 +84,13 @@ object ApkBuilder {
                     var data = zf.getInputStream(e).readBytes()
                     if (icon != null && n == fgPath) { data = icon.fg; iconHits++ }
                     else if (icon != null && n == bgPath) { data = icon.bg; iconHits++ }
-                    if (n == "AndroidManifest.xml") {
+                    else if (n == "AndroidManifest.xml") {
                         replaceAll(data, PKG_PLACEHOLDER, pkg)
-                        replaceAll(data, LABEL_PLACEHOLDER, label.padEnd(32))
+                        // Any name, any length (also Bengali): rebuild the manifest string pool.
+                        val patched = AxmlPatcher.replaceString(data, LABEL_PLACEHOLDER, label)
+                            ?: AxmlPatcher.replaceString(data, "Boxly", label)
+                        if (patched != null) data = patched
+                        else if (label.all { it.code in 32..126 }) replaceAll(data, LABEL_PLACEHOLDER, label.padEnd(32))
                     } else if (n == "resources.arsc") {
                         replaceAll(data, PKG_PLACEHOLDER, pkg)
                     }
@@ -97,8 +107,8 @@ object ApkBuilder {
         return iconHits == 2
     }
 
-    private fun sign(input: File, output: File) {
-        ApkSigner.Builder(listOf(signerConfig()))
+    private fun sign(ctx: Context, input: File, output: File) {
+        ApkSigner.Builder(listOf(customConfig(ctx) ?: signerConfig()))
             .setInputApk(input).setOutputApk(output)
             .setMinSdkVersion(26)
             .setV1SigningEnabled(true).setV2SigningEnabled(true)
@@ -107,6 +117,59 @@ object ApkBuilder {
             .build().sign()
     }
 
+    // ---------- your own signing key (PKCS12 / .p12) ----------
+    private class KeyMaterial(val alias: String, val key: PrivateKey, val chain: List<X509Certificate>)
+
+    private fun loadKey(bytes: ByteArray, alias: String, storePw: CharArray, keyPw: CharArray): KeyMaterial {
+        for (type in listOf("PKCS12", "BKS")) {
+            try {
+                val ks = KeyStore.getInstance(type)
+                ks.load(ByteArrayInputStream(bytes), storePw)
+                val names = ks.aliases().toList()
+                val real = names.firstOrNull { it.equals(alias, true) }
+                    ?: if (alias.isEmpty() && names.size == 1) names[0]
+                    else throw IllegalArgumentException("Alias \"$alias\" not found. Found: ${names.joinToString()}")
+                val key = ks.getKey(real, if (keyPw.isEmpty()) storePw else keyPw) as? PrivateKey
+                    ?: throw IllegalArgumentException("No private key under this alias")
+                val chain = ks.getCertificateChain(real)?.map { it as X509Certificate }
+                    ?: throw IllegalArgumentException("No certificate under this alias")
+                return KeyMaterial(real, key, chain)
+            } catch (e: IllegalArgumentException) {
+                throw e
+            } catch (e: Exception) {
+                // try the next keystore type
+            }
+        }
+        throw IllegalStateException("Could not open the keystore: wrong password, or not a PKCS12 (.p12) file.")
+    }
+
+    /** Checks the key works, then stores it privately. Returns the real alias. */
+    fun saveCustomKey(ctx: Context, bytes: ByteArray, alias: String, storePw: String, keyPw: String): String {
+        val m = loadKey(bytes, alias, storePw.toCharArray(), keyPw.toCharArray())
+        File(ctx.filesDir, "custom.keystore").writeBytes(bytes)
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString("ks_alias", m.alias).putString("ks_pw", storePw).putString("ks_kpw", keyPw).apply()
+        return m.alias
+    }
+
+    fun clearCustomKey(ctx: Context) {
+        File(ctx.filesDir, "custom.keystore").delete()
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove("ks_alias").remove("ks_pw").remove("ks_kpw").apply()
+    }
+
+    fun customAlias(ctx: Context): String? =
+        if (File(ctx.filesDir, "custom.keystore").exists()) ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("ks_alias", null) else null
+
+    private fun customConfig(ctx: Context): ApkSigner.SignerConfig? {
+        val f = File(ctx.filesDir, "custom.keystore")
+        if (!f.exists()) return null
+        val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val m = loadKey(f.readBytes(), p.getString("ks_alias", "") ?: "",
+            (p.getString("ks_pw", "") ?: "").toCharArray(), (p.getString("ks_kpw", "") ?: "").toCharArray())
+        return ApkSigner.SignerConfig.Builder("custom", m.key, m.chain).build()
+    }
+
+    // ---------- default key (Android Keystore) ----------
     private fun signerConfig(): ApkSigner.SignerConfig {
         val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         if (!ks.containsAlias(ALIAS)) {

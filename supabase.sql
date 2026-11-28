@@ -72,3 +72,50 @@ grant execute on function public.get_app_config(int, text) to anon, authenticate
 -- See users:        select user_no, device, android, app_version, first_seen, last_seen, opens from installs order by user_no;
 -- Only version 6.0.0 may run (all others see the popup):  update app_config set allowed_version = '6.0.0' where id = 1;
 -- Turn the version rule off:                              update app_config set allowed_version = '' where id = 1;
+
+-- ===== v5: daily usage (opens + foreground time per user per day, Bangladesh time) =====
+create table if not exists public.daily_usage (
+  install_id uuid not null references public.installs(install_id) on delete cascade,
+  day        date not null,
+  opens      int  not null default 0,
+  seconds    int  not null default 0,
+  primary key (install_id, day)
+);
+alter table public.daily_usage enable row level security;
+
+create or replace function public.track_usage(p_id uuid, p_seconds int default 0, p_open boolean default false)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  d date := (now() at time zone 'Asia/Dhaka')::date;
+  s int := greatest(0, least(coalesce(p_seconds, 0), 600));
+  o int := case when p_open then 1 else 0 end;
+begin
+  if not exists (select 1 from installs where install_id = p_id) then return; end if;
+  insert into daily_usage (install_id, day, opens, seconds) values (p_id, d, o, s)
+  on conflict (install_id, day) do update
+    set opens = daily_usage.opens + o, seconds = daily_usage.seconds + s;
+  update installs set last_seen = now() where install_id = p_id;
+end $$;
+revoke all on function public.track_usage(uuid, int, boolean) from public;
+grant execute on function public.track_usage(uuid, int, boolean) to anon, authenticated;
+
+create or replace view public.usage_per_user with (security_invoker = true) as
+select i.user_no, i.device, i.android, i.app_version, count(d.day) as days_active,
+       coalesce(sum(d.opens), 0) as opens, round(coalesce(sum(d.seconds), 0) / 3600.0, 2) as hours,
+       i.first_seen, i.last_seen
+from public.installs i left join public.daily_usage d on d.install_id = i.install_id
+group by i.install_id, i.user_no, i.device, i.android, i.app_version, i.first_seen, i.last_seen
+order by i.user_no;
+
+create or replace view public.usage_daily with (security_invoker = true) as
+select day, count(*) as active_users, sum(opens) as opens, round(sum(seconds) / 3600.0, 2) as total_hours,
+       round(sum(seconds) / 60.0 / count(*), 1) as avg_minutes_per_user
+from public.daily_usage group by day order by day desc;
+
+create or replace view public.usage_user_day with (security_invoker = true) as
+select d.day, i.user_no, i.device, d.opens, round(d.seconds / 60.0, 1) as minutes
+from public.daily_usage d join public.installs i on i.install_id = d.install_id
+order by d.day desc, d.seconds desc;
+revoke all on public.usage_per_user, public.usage_daily, public.usage_user_day from anon, authenticated;
+-- Read:  select * from usage_daily;  select * from usage_per_user;  select * from usage_user_day;
+

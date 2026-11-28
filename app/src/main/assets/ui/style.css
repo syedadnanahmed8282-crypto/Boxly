@@ -190,3 +190,13 @@ button.sw{flex:none}
 @keyframes mblink{0%,92%,100%{transform:scaleY(1)}96%{transform:scaleY(.08)}}
 @keyframes mtw{0%,100%{opacity:0;transform:scale(.3) rotate(0)}50%{opacity:1;transform:scale(1) rotate(60deg)}}
 @keyframes mheart{0%{opacity:0;transform:translate(0,8px) scale(.6)}25%{opacity:1}100%{opacity:0;transform:translate(8px,-24px) scale(1.1)}}
+
+/* ===== v5 fixes: keyboard, own key ===== */
+.app{height:calc(100% - var(--kb,0px))}
+body.kb .nav{display:none}
+.keybox{padding:14px;display:flex;flex-direction:column;gap:12px}
+.kf{display:flex;flex-direction:column;gap:10px}
+.kf input{width:100%;box-sizing:border-box;height:44px;border-radius:12px;border:1px solid #E4DEF7;background:#fff;padding:0 12px;font-size:13.5px;outline:0}
+/* long popup messages: the card scrolls instead of being cut off */
+.gcard{max-height:100%;overflow-y:auto}
+.gcard>*{flex-shrink:0}

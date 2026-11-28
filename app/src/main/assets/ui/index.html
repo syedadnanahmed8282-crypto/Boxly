@@ -58,7 +58,11 @@
 
 <section class="scr" id="settings"><div class="h1" style="margin-top:6px">Settings</div>
  <div class="sec">Signing</div>
- <div class="glass list"><div class="it"><div class="grow"><b>Signing key</b><span class="mut">Created and kept on this device (Android Keystore)</span></div></div><div class="it"><div class="grow"><b>Version</b><span class="mut">Boxly 4.0.0</span></div></div></div>
+ <div class="glass list"><div class="it"><div class="grow"><b>Signing key</b><span class="mut" id="keyinfo">Boxly device key (default)</span></div></div><div class="it"><div class="grow"><b>Version</b><span class="mut">Boxly 5.0.0</span></div></div></div>
+ <div class="glass keybox"><div class="mut">Use your own key so updates keep working on any phone. Needs a PKCS12 file (.p12 / .pfx).</div>
+ <button class="btn ghost" id="kpick">Import keystore</button>
+ <div class="kf" id="kform" hidden><div class="mut" id="kfile"></div><input id="kalias" placeholder="Key alias" autocapitalize="off" autocorrect="off" spellcheck="false"><input id="kpw" type="password" placeholder="Keystore password"><input id="kkpw" type="password" placeholder="Key password (only if different)"><button class="btn" id="ksave">Save key</button></div>
+ <button class="btn ghost" id="kclr" hidden>Remove my key</button></div>
  <div class="sec">Tips</div>
  <div class="glass list"><div class="it"><div class="grow"><b>App icon</b><span class="mut">A square PNG with a transparent background looks best.</span></div></div><div class="it"><div class="grow"><b>Website apps</b><span class="mut">URL apps load the live site, so they need internet. Some sites (like Google sign-in) block in-app browsers.</span></div></div></div>
  <div class="sec">Native API for your apps</div>

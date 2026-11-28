@@ -13,8 +13,8 @@ android {
         minSdk = 26
         // 29 on purpose: resources.arsc may be recompressed when we repack the APK.
         targetSdk = 29
-        versionCode = 4
-        versionName = "4.0.0"
+        versionCode = 5
+        versionName = "5.0.0"
     }
     signingConfigs {
         // Same key on every GitHub build (from repo secrets), so new APKs can update old installs.

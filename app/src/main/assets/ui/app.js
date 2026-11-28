@@ -22,6 +22,7 @@ function show(id) {
   $('#nav').style.setProperty('--k', NAV[id]);
   ['home', 'history', 'settings'].forEach(n => $('#n-' + n).classList.toggle('on', n === id));
   if (id === 'history') renderHistory();
+  if (id === 'settings') refreshKey();
 }
 ['home', 'history', 'settings'].forEach(n => $('#n-' + n).onclick = () => show(n));
 $('#again').onclick = () => show('home');
@@ -173,3 +174,40 @@ window.onAppConfig = c => {
   g.hidden = false;
 };
 $('#gr').onclick = () => { if (B.recheck) B.recheck(); toast('Checking\u2026'); };
+
+/* ---------- keyboard: lift the page above it ---------- */
+window.onKeyboard = h => {
+  document.documentElement.style.setProperty('--kb', h + 'px');
+  document.body.classList.toggle('kb', h > 0);
+  const a = document.activeElement;
+  if (h > 0 && a && a.scrollIntoView) setTimeout(() => a.scrollIntoView({ block: 'center', behavior: 'smooth' }), 120);
+};
+
+/* ---------- name + icon found inside the ZIP ---------- */
+window.onAutoFill = (name, preview) => {
+  if (name && !nameTouched) $('#n').value = name;
+  if (preview) {
+    iconUrl = preview;
+    const p = $('#iprev'); p.innerHTML = '<img alt="App icon preview" src="' + preview + '">';
+    p.classList.remove('pop'); void p.offsetWidth; p.classList.add('pop');
+    $('#ihint').textContent = 'Icon from your project'; $('#iclr').hidden = false;
+  }
+};
+
+/* ---------- own signing key ---------- */
+function refreshKey() {
+  try {
+    const k = JSON.parse(B.keyInfo());
+    $('#keyinfo').textContent = k.custom ? 'Your key (alias: ' + k.alias + ')' : 'Boxly device key (default)';
+    $('#kclr').hidden = !k.custom;
+  } catch (e) {}
+}
+$('#kpick').onclick = () => B.pickKeystore();
+window.onKeystorePicked = n => { $('#kfile').textContent = n; $('#kform').hidden = false; };
+$('#ksave').onclick = () => B.saveKeystore($('#kalias').value.trim(), $('#kpw').value, $('#kkpw').value);
+window.onKeystoreResult = (ok, msg) => {
+  toast(msg);
+  if (ok) { $('#kform').hidden = true; $('#kpw').value = ''; $('#kkpw').value = ''; refreshKey(); }
+};
+$('#kclr').onclick = () => { B.removeKeystore(); refreshKey(); toast('Using the Boxly device key'); };
+refreshKey();

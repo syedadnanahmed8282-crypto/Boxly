@@ -5,9 +5,13 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 import android.provider.OpenableColumns
 import android.provider.Settings
 import android.view.WindowManager
@@ -31,6 +35,10 @@ class BuilderActivity : Activity() {
     private lateinit var web: WebView
     private var zipFiles: Map<String, ByteArray>? = null
     private var icon: IconAssets? = null
+    private var iconManual = false
+    private var pendingKs: ByteArray? = null
+    private var kbPx = -1
+    private var navBottomPx = 0
     private var insetsJs = ""
     private var cfgJs = ""
     private val prefs by lazy { getSharedPreferences("boxly", MODE_PRIVATE) }
@@ -56,10 +64,23 @@ class BuilderActivity : Activity() {
         ViewCompat.setOnApplyWindowInsetsListener(web) { _, ins ->
             val b = ins.getInsets(WindowInsetsCompat.Type.systemBars())
             val d = resources.displayMetrics.density
+            navBottomPx = b.bottom
+            if (Build.VERSION.SDK_INT >= 30) pushKeyboard(ins.getInsets(WindowInsetsCompat.Type.ime()).bottom)
             insetsJs = "document.documentElement.style.setProperty('--sat','${b.top / d}px');" +
                 "document.documentElement.style.setProperty('--sab','${b.bottom / d}px');"
             web.evaluateJavascript(insetsJs, null)
             ins
+        }
+
+        if (Build.VERSION.SDK_INT < 30) {
+            // Older Android: measure how much of the screen the keyboard covers.
+            window.decorView.viewTreeObserver.addOnGlobalLayoutListener {
+                val r = Rect()
+                window.decorView.getWindowVisibleDisplayFrame(r)
+                val h = window.decorView.rootView.height
+                val covered = h - r.bottom
+                pushKeyboard(if (covered > navBottomPx + h * 0.12f) covered else 0)
+            }
         }
 
         val loader = WebViewAssetLoader.Builder()
@@ -80,9 +101,32 @@ class BuilderActivity : Activity() {
         Telemetry.register(this)
     }
 
+    private val handler = Handler(Looper.getMainLooper())
+    private var lastBeat = 0L
+    private val beat = object : Runnable {
+        override fun run() { flushUsage(); handler.postDelayed(this, 30_000) }
+    }
+
+    /** Usage tracking: counts seconds while the app is on screen (sent every 30 s and on leaving). */
+    private fun flushUsage() {
+        val now = SystemClock.elapsedRealtime()
+        val s = ((now - lastBeat) / 1000).toInt()
+        lastBeat = now
+        if (s > 0) Telemetry.usage(this, s, false)
+    }
+
     override fun onResume() {
         super.onResume()
         checkConfig()
+        lastBeat = SystemClock.elapsedRealtime()
+        Telemetry.usage(this, 0, true)
+        handler.postDelayed(beat, 30_000)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        handler.removeCallbacks(beat)
+        flushUsage()
     }
 
     /** Remote popup: asks Supabase whether the app must show the "update required" screen. */
@@ -94,6 +138,13 @@ class BuilderActivity : Activity() {
     }
 
     private fun js(code: String) = runOnUiThread { web.evaluateJavascript("window.$code", null) }
+
+    /** Tells the page how tall the keyboard is (CSS px) so it can lift the form above it. */
+    private fun pushKeyboard(px: Int) {
+        if (px == kbPx) return
+        kbPx = px
+        js("onKeyboard(${px / resources.displayMetrics.density})")
+    }
 
     private fun apkFile(path: String): File? {
         val f = File(path).canonicalFile
@@ -150,6 +201,15 @@ class BuilderActivity : Activity() {
             ?: throw IllegalStateException("Could not read this image (use PNG or JPG)")
     }
 
+    private fun decodeBytes(b: ByteArray): Bitmap {
+        val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(b, 0, b.size, o)
+        var s = 1
+        while (maxOf(o.outWidth, o.outHeight) / s > 1024) s *= 2
+        return BitmapFactory.decodeByteArray(b, 0, b.size, BitmapFactory.Options().apply { inSampleSize = s })
+            ?: throw IllegalStateException("Could not read icon")
+    }
+
     private fun normUrl(u: String): String {
         var s = u.trim()
         if (!Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://").containsMatchIn(s)) s = "https://$s"
@@ -191,6 +251,22 @@ class BuilderActivity : Activity() {
                     }
                     val kb = files.values.sumOf { it.size.toLong() } / 1024
                     js("onZipPicked(${JSONObject.quote(name)}, ${files.size}, $kb, ${files.containsKey("index.html")})")
+                    // Take the app name and icon from manifest.json / favicon when the project has them.
+                    val info = PwaInfo.inspect(files)
+                    val iconPath = info.iconPath
+                    var preview = ""
+                    if (!iconManual && iconPath != null) {
+                        runCatching {
+                            val bmp = decodeBytes(files[iconPath]!!)
+                            val (assets, pv) = IconMaker.make(bmp)
+                            bmp.recycle()
+                            icon = assets
+                            preview = pv
+                        }
+                    }
+                    if (info.name != null || preview.isNotEmpty()) {
+                        js("onAutoFill(${JSONObject.quote(info.name ?: "")}, ${JSONObject.quote(preview)})")
+                    }
                 } catch (e: Throwable) {
                     zipFiles = null
                     js("onZipError(${JSONObject.quote(e.message ?: "Could not read ZIP")})")
@@ -203,10 +279,26 @@ class BuilderActivity : Activity() {
                     val (assets, preview) = IconMaker.make(bmp)
                     bmp.recycle()
                     icon = assets
+                    iconManual = true
                     js("onIconPicked(${JSONObject.quote(preview)})")
                 } catch (e: Throwable) {
                     icon = null
                     js("onIconError(${JSONObject.quote(e.message ?: "Could not read image")})")
+                }
+            }.start()
+        } else if (requestCode == 3) {
+            Thread {
+                try {
+                    val b = contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+                    if (b.size > 1_000_000) throw IllegalStateException("This file is too large for a keystore")
+                    pendingKs = b
+                    var name = "keystore"
+                    contentResolver.query(uri, null, null, null, null)?.use { c ->
+                        if (c.moveToFirst()) { val i = c.getColumnIndex(OpenableColumns.DISPLAY_NAME); if (i >= 0) name = c.getString(i) }
+                    }
+                    js("onKeystorePicked(${JSONObject.quote(name)})")
+                } catch (e: Throwable) {
+                    js("onKeystoreResult(false, ${JSONObject.quote(e.message ?: "Could not read the file")})")
                 }
             }.start()
         }
@@ -230,7 +322,7 @@ class BuilderActivity : Activity() {
             }, 2)
         }
 
-        @JavascriptInterface fun clearIcon() { icon = null }
+        @JavascriptInterface fun clearIcon() { icon = null; iconManual = false }
 
         /** Code or ZIP project -> APK. json is "zip" or {"index.html": "...", ...}. */
         @JavascriptInterface
@@ -281,6 +373,35 @@ class BuilderActivity : Activity() {
             } catch (e: Throwable) {
                 js("onToast(${JSONObject.quote(e.message ?: e.toString())})")
             }
+        }
+
+        @JavascriptInterface
+        fun pickKeystore() = runOnUiThread {
+            @Suppress("DEPRECATION")
+            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE); type = "*/*"
+            }, 3)
+        }
+
+        @JavascriptInterface
+        fun saveKeystore(alias: String, storePw: String, keyPw: String) {
+            Thread {
+                try {
+                    val b = pendingKs ?: throw IllegalStateException("Choose a keystore file first")
+                    val a = ApkBuilder.saveCustomKey(this@BuilderActivity, b, alias, storePw, keyPw)
+                    pendingKs = null
+                    js("onKeystoreResult(true, ${JSONObject.quote("Your key is saved (alias: $a)")})")
+                } catch (e: Throwable) {
+                    js("onKeystoreResult(false, ${JSONObject.quote(e.message ?: "Could not use this key")})")
+                }
+            }.start()
+        }
+
+        @JavascriptInterface fun removeKeystore() { ApkBuilder.clearCustomKey(this@BuilderActivity) }
+
+        @JavascriptInterface fun keyInfo(): String {
+            val a = ApkBuilder.customAlias(this@BuilderActivity)
+            return JSONObject().put("custom", a != null).put("alias", a ?: "").toString()
         }
 
         @JavascriptInterface fun recheck() { checkConfig() }

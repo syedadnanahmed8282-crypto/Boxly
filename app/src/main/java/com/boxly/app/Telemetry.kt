@@ -8,6 +8,7 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.UUID
+import java.util.concurrent.Executors
 
 /**
  * Boxly builder app only (generated apps never call this).
@@ -23,6 +24,9 @@ object Telemetry {
 
     private val enabled: Boolean
         get() = SUPABASE_URL.startsWith("https://") && !SUPABASE_URL.contains("YOUR-") && !SUPABASE_KEY.contains("YOUR-")
+
+    // One worker thread so register_install always runs before track_usage.
+    private val io = Executors.newSingleThreadExecutor()
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences("boxly", Context.MODE_PRIVATE)
 
@@ -54,7 +58,7 @@ object Telemetry {
     fun register(ctx: Context) {
         if (!enabled) return
         val app = ctx.applicationContext
-        Thread {
+        io.execute {
             runCatching {
                 post("register_install", JSONObject()
                     .put("p_id", installId(app))
@@ -62,7 +66,18 @@ object Telemetry {
                     .put("p_android", Build.VERSION.RELEASE ?: "")
                     .put("p_version", pkgInfo(app).versionName ?: ""))
             }
-        }.start()
+        }
+    }
+
+    /** Adds foreground seconds (and optionally one "open") to today's usage row for this install. */
+    fun usage(ctx: Context, seconds: Int, open: Boolean) {
+        if (!enabled) return
+        val app = ctx.applicationContext
+        io.execute {
+            runCatching {
+                post("track_usage", JSONObject().put("p_id", installId(app)).put("p_seconds", seconds).put("p_open", open))
+            }
+        }
     }
 
     /** Calls back with a clean JSON object string. Falls back to the last known config when offline. */
